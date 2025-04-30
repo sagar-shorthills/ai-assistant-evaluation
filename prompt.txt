@@ -1,0 +1,189 @@
+MongoDB Data Exploration Tool with GST Integration
+Build a full-stack MongoDB Data Exploration Tool with GST calculation capabilities using Node.js, Express, React.js, and Material UI.
+Tech Stack Requirements
+
+Backend: Node.js + Express.js (latest stable versions)
+Database: MongoDB with official Node.js driver (latest version)
+Frontend: React.js (latest stable version)
+UI Components: Material UI (MUI v5+)
+State Management: React State / Context API or React Query
+File Export: xlsx, papaparse, jspdf
+Dependencies: Use only compatible and up-to-date dependencies to avoid conflicts
+
+Backend (Node.js + Express)
+MongoDB Connection
+
+Use the official MongoDB npm package to connect to MongoDB
+Store credentials securely using environment variables
+Implement connection pooling for optimal performance
+
+API Endpoints
+
+GET /collections: Return a list of available collections in the MongoDB database
+GET /fields?collection=collectionName: Fetch the first document from the specified collection and dynamically extract available fields/columns
+POST /query: Accept collection name, limit, selected fields, and GST configuration as parameters. Return query results based on the selection with calculated GST amounts
+POST /export: Accept selected data and desired format (excel, csv, json, pdf). Return the generated file ready for download
+GET /receipt/: Generate a receipt-style view for a specific document
+
+Error Handling
+
+APIs must respond with appropriate HTTP status codes and error messages
+MongoDB errors must be caught, properly logged, and handled gracefully
+Implement rate limiting to prevent abuse
+
+Frontend (React.js + Material UI)
+Layout
+
+Header: Clean, modern application title with intuitive navigation
+Left Sidebar:
+
+Application navigation menu
+Collection selector (MUI Select component)
+Numeric input for "Limit Results" (default 5) (MUI TextField)
+Dynamic multi-select widget for fields (MUI Autocomplete with multiple select)
+GST configuration section
+
+
+Main Area:
+
+Results display panel
+Toggle between Table and JSON view
+Download options
+Individual record actions (Print/Receipt view)
+
+
+
+GST Integration Features
+
+GST Configuration:
+
+Dropdown to select GST percentage (e.g., 5%, 12%, 18%, 28%)
+Field selector to choose which field to apply GST on
+Apply button to calculate GST on existing results
+
+
+GST Calculation:
+
+Add a new column "GST Amount" in results
+Calculate using formula: Selected Field Value / GST Percentage * 100
+Update JSON view to include GST Amount field
+Ensure GST calculations are included in all export formats
+
+
+Receipt Generation:
+
+Add a "Print Receipt" button for each record
+Generate a receipt-style view showing document details with GST calculation
+Allow printing and downloading of individual receipts
+Use jspdf or similar library for PDF generation
+
+
+
+Dynamic Field Selection
+
+When a user selects a collection:
+
+Fetch available fields dynamically using /fields API
+Populate fields multi-select based on the fetched fields
+Display all fields directly without requiring additional selection from dropdown
+
+
+
+Results Display
+
+Table View (MUI DataGrid or Table) by default
+
+Clear column headers
+Pagination for large result sets
+Sortable columns
+Row actions (Print Receipt)
+
+
+JSON View alternative
+
+Formatted JSON with syntax highlighting
+Collapsible sections for better readability
+
+
+Maintain results even if view toggles or downloads happen
+
+Export Functionality
+
+Primary Download Button with dropdown offering:
+
+Excel format (default)
+CSV format
+JSON format
+PDF format
+
+
+Include calculated GST amount in all exported files
+Show progress indicator during export generation
+
+State Management
+
+Persist fetched query results locally using React state
+Results should not reset unless a new query is explicitly triggered
+Save user preferences (selected collection, fields, GST settings) to browser storage
+
+UI/UX Requirements
+
+Clean, modern UI following Material UI best practices
+Intuitive layout with clear visual hierarchy
+Responsive design that works on various screen sizes
+Proper loading indicators when data is being fetched
+Toast notifications for errors and success messages
+Consistent color scheme and typography
+Accessibility compliance (WCAG 2.1 AA)
+
+Error Handling & Validation
+
+Form validation for all inputs
+Graceful handling of empty results
+Friendly error messages for failed operations
+Network error detection and retry options
+
+Project Structure & Code Quality
+
+Well-structured project directories (/backend, /frontend)
+Separation of concerns (components, services, utilities)
+Production-quality, maintainable code with proper comments
+Consistent code style and formatting
+Unit tests for critical functionality
+
+Deliverables
+
+Complete source code with clear directory structure
+.env template for MongoDB credentials (server-side only)
+Frontend setup with Material UI components
+Documentation (README) explaining:
+
+Setup instructions
+Environment configuration
+Available features
+API endpoints
+GST calculation logic
+
+
+Docker configuration for easy deployment (optional)
+
+Sample Document Structure
+json{
+  "_id": {"$oid": "6811a7051c6d4566e8bb0183"},
+  "Segment": "Government",
+  "Country": "Canada",
+  "Product": "Carretera",
+  "Discount Band": "None",
+  "Units Sold": {"$numberDouble": "1618.5"},
+  "Manufacturing Price": {"$numberInt": "3"},
+  "Sale Price": {"$numberInt": "20"},
+  "Gross Sales": {"$numberInt": "32370"},
+  "Discounts": {"$numberInt": "0"},
+  "Sales": {"$numberInt": "32370"},
+  "COGS": {"$numberInt": "16185"},
+  "Profit": {"$numberInt": "16185"},
+  "Date": {"$numberInt": "41640"},
+  "Month Number": {"$numberInt": "1"},
+  "Month Name": "January",
+  "Year": "2014"
+}
