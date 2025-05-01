@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     AppBar,
     Toolbar,
@@ -6,44 +6,34 @@ import {
     Box,
     useTheme,
     useMediaQuery,
-    Avatar,
 } from '@mui/material';
 import DatabaseIcon from '@mui/icons-material/Storage';
-import {styled} from '@mui/material/styles';
-import Badge from '@mui/material/Badge';
+import UserAvatar from './UserAvatar';
+import UserMenu from './UserMenu';
 
-const StyledBadge = styled(Badge)(({theme}) => ({
-    '& .MuiBadge-badge': {
-        backgroundColor: '#44b700',
-        color: '#44b700',
-        boxShadow: `0 0 0 2px ${theme.palette.background.paper}`,
-        '&::after': {
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            borderRadius: '50%',
-            animation: 'ripple 1.2s infinite ease-in-out',
-            border: '1px solid currentColor',
-            content: '""',
-        },
-    },
-    '@keyframes ripple': {
-        '0%': {
-            transform: 'scale(.8)',
-            opacity: 1,
-        },
-        '100%': {
-            transform: 'scale(2.4)',
-            opacity: 0,
-        },
-    },
-}));
-
+/**
+ * Header component displays the application header with navigation and user controls
+ * @returns {JSX.Element} Header component
+ */
 const Header = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const [anchorEl, setAnchorEl] = useState(null);
+
+    // Mock user data - replace with actual user data from your auth system
+    const user = {
+        name: 'Sagar Saini',
+        email: 'sagarsaini@gmail.com',
+        avatar: null,
+    };
+
+    const handleMenuOpen = (event) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+    };
 
     return (
         <AppBar
@@ -59,32 +49,20 @@ const Header = () => {
             }}
         >
             <Toolbar>
-                <DatabaseIcon sx={{mr: 2}}/>
-                <Typography variant="h6" component="div" sx={{flexGrow: 1, fontWeight: 500}}>
+                <DatabaseIcon sx={{ mr: 2 }} />
+                <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 500 }}>
                     {isMobile ? 'MongoDB Explorer' : 'MongoDB Data Exploration Tool with GST Integration'}
                 </Typography>
 
-                <Box sx={{display: 'flex', alignItems: 'center'}}>
-                    <StyledBadge
-                        overlap="circular"
-                        anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
-                        variant="dot"
-                    >
-                        <Avatar
-                            sx={{
-                                bgcolor: theme.palette.secondary.main,
-                                color: theme.palette.secondary.contrastText,
-                                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.15)',
-                                width: 36,
-                                height: 36
-                            }}
-                            sizes={'small'}
-                        >
-                            SS
-                        </Avatar>
-                    </StyledBadge>
-
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <UserAvatar user={user} onClick={handleMenuOpen} />
                 </Box>
+
+                <UserMenu
+                    anchorEl={anchorEl}
+                    onClose={handleMenuClose}
+                    user={user}
+                />
             </Toolbar>
         </AppBar>
     );

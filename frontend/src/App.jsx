@@ -1,8 +1,7 @@
 import React, {useContext} from 'react';
 import {Box, CssBaseline, Toolbar, Paper, Stack} from '@mui/material';
 import {ToastContainer} from 'react-toastify';
-import {ThemeProvider} from '@mui/material/styles';
-import theme from './theme';
+import {ThemeProvider} from './contexts/ThemeContext';
 import Header from './components/common/Header';
 import Sidebar from './components/common/Sidebar';
 import ResultsTable from './components/results/ResultsTable';
@@ -41,7 +40,7 @@ const MainContent = () => {
 // App component with providers
 const App = () => {
     return (
-        <ThemeProvider theme={theme}>
+        <ThemeProvider>
             <AppProvider>
                 <Box sx={{display: 'flex'}}>
                     <CssBaseline/>

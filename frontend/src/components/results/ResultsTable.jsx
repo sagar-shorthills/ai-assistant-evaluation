@@ -1,7 +1,6 @@
 import React, {useContext, useMemo} from 'react';
 import {
     DataGrid,
-    GridToolbar,
     gridClasses
 } from '@mui/x-data-grid';
 import {
@@ -15,6 +14,7 @@ import {
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import {AppContext} from '../../contexts/AppContext';
 import {drawerWidth} from "../common/Sidebar";
+import CustomGridToolbar from './CustomGridToolbar';
 
 function getAvailableWidth(drawerWidth) {
     if (typeof drawerWidth !== 'number') {
@@ -173,7 +173,7 @@ const ResultsTable = () => {
                 }}
                 pageSizeOptions={[5, 10, 25, 50, 100]}
                 slots={{
-                    toolbar: GridToolbar
+                    toolbar: CustomGridToolbar
                 }}
                 slotProps={{
                     toolbar: {
