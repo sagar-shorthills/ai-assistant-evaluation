@@ -32,7 +32,7 @@ function applyGST(results, gstField, gstPercentage) {
         return {
             ...item,
             'GST Amount': gstAmount,
-            'Total Amount': parseFloat((fieldValue + gstAmount).toFixed(2))
+            // 'Total Amount': parseFloat((fieldValue + gstAmount).toFixed(2))
         };
     });
 }
