@@ -34,8 +34,16 @@ const ResultsTable = () => {
         const firstResult = results[0];
         return Object.keys(firstResult).map((key) => {
             // List of columns that should display currency with $ symbol
-            const currencyColumns = ['Sales', 'Sale Price', 'GST Amount', 'Total Amount'];
+            const currencyColumns = [
+                'Manufacturing Price', 
+                'Sale Price', 
+                'Sales', 
+                'Profit',
+                'GST Amount',
+                'Total Amount'
+            ];
             const isCurrencyColumn = currencyColumns.includes(key);
+            const isDateColumn = key === 'Date';
 
             return {
                 field: key,
@@ -44,31 +52,52 @@ const ResultsTable = () => {
                 hide: key === '_id',
                 renderCell: (params) => {
                     // Handle different data types for display
-                    const value = params.value;
+                    let value = params.value;
 
                     if (value === null || value === undefined) {
                         return '';
-                    } else if (typeof value === 'object') {
+                    } else if (typeof value === 'string') {
+                        value = value.trim();
+                    }
+
+                    if (typeof value === 'object') {
                         // Handle MongoDB ObjectId or Date objects
                         if (value && value['$oid']) {
-                            return value['$oid'];
+                            return value['$oid'].trim();
                         } else if (value && value['$date']) {
                             return new Date(value['$date']).toLocaleString();
                         } else if (value && value['$numberInt']) {
+                            const numValue = parseInt(value['$numberInt'].toString().trim());
                             return isCurrencyColumn ?
-                                `$ ${parseInt(value['$numberInt']).toFixed(2)}` :
-                                parseInt(value['$numberInt']);
+                                `$ ${numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` :
+                                numValue;
                         } else if (value && value['$numberDouble']) {
+                            const numValue = parseFloat(value['$numberDouble'].toString().trim());
                             return isCurrencyColumn ?
-                                `$ ${parseFloat(value['$numberDouble']).toFixed(2)}` :
-                                parseFloat(value['$numberDouble']).toFixed(2);
+                                `$ ${numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` :
+                                numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         } else {
                             return JSON.stringify(value);
                         }
                     } else if (isCurrencyColumn) {
                         // Format currency columns
+                        if (typeof value === 'string') {
+                            value = parseFloat(value.trim());
+                        }
                         return typeof value === 'number' ?
-                            `$ ${value.toFixed(2)}` : value;
+                            `$ ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : value;
+                    } else if (isDateColumn) {
+                        // Format date column
+                        try {
+                            const date = new Date(value.toString().trim());
+                            return date.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                            });
+                        } catch (e) {
+                            return value;
+                        }
                     }
 
                     return value;
