@@ -29,7 +29,7 @@ const CollectionSelector = () => {
 
     return (
         <Box sx={{ mb: 2 }}>
-            <FormControl fullWidth sx={{ mb: 2 }}>
+            <FormControl fullWidth sx={{ mb: 2 }} variant="filled" size='small'>
                 <InputLabel id="collection-select-label">Collection</InputLabel>
                 <Select
                     labelId="collection-select-label"
@@ -62,6 +62,8 @@ const CollectionSelector = () => {
                 inputProps={{ min: 1, max: 100 }}
                 disabled={loading}
                 sx={{ mb: 2 }}
+                variant="filled"
+                size='small'
             />
 
             <Button

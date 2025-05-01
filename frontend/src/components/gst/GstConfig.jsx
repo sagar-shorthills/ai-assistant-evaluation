@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, {useContext, useState, useEffect} from 'react';
 import {
     Box,
     FormControl,
@@ -11,9 +11,43 @@ import {
     Button,
 } from '@mui/material';
 import CalculateIcon from '@mui/icons-material/Calculate';
-import { AppContext } from '../../contexts/AppContext';
+import {AppContext} from '../../contexts/AppContext';
+import {styled} from '@mui/material/styles';
 
 const GST_PERCENTAGES = [5, 12, 18, 28];
+
+const Android12Switch = styled(Switch)(({theme}) => ({
+    padding: 8,
+    '& .MuiSwitch-track': {
+        borderRadius: 22 / 2,
+        '&::before, &::after': {
+            content: '""',
+            position: 'absolute',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 16,
+            height: 16,
+        },
+        '&::before': {
+            backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
+                theme.palette.getContrastText(theme.palette.primary.main),
+            )}" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>')`,
+            left: 12,
+        },
+        '&::after': {
+            backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24"><path fill="${encodeURIComponent(
+                theme.palette.getContrastText(theme.palette.primary.main),
+            )}" d="M19,13H5V11H19V13Z" /></svg>')`,
+            right: 12,
+        },
+    },
+    '& .MuiSwitch-thumb': {
+        boxShadow: 'none',
+        width: 16,
+        height: 16,
+        margin: 2,
+    },
+}));
 
 const GstConfig = () => {
     const {
@@ -75,10 +109,10 @@ const GstConfig = () => {
     };
 
     return (
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{mb: 2}}>
             <FormControlLabel
                 control={
-                    <Switch
+                    <Android12Switch
                         checked={gstConfig.enabled}
                         onChange={handleGstEnabledChange}
                         disabled={loading || !selectedCollection || fields.length === 0}
@@ -89,8 +123,8 @@ const GstConfig = () => {
 
             {gstConfig.enabled && (
                 <>
-                    <Box sx={{ mt: 2 }}>
-                        <FormControl fullWidth sx={{ mb: 2 }}>
+                    <Box sx={{mt: 2}}>
+                        <FormControl fullWidth sx={{mb: 2}} variant="filled" size='small'>
                             <InputLabel id="gst-field-label">GST Field</InputLabel>
                             <Select
                                 labelId="gst-field-label"
@@ -108,7 +142,7 @@ const GstConfig = () => {
                             </Select>
                         </FormControl>
 
-                        <FormControl fullWidth sx={{ mb: 2 }}>
+                        <FormControl fullWidth sx={{mb: 2}} variant="filled" size='small'>
                             <InputLabel id="gst-percentage-label">GST Percentage</InputLabel>
                             <Select
                                 labelId="gst-percentage-label"
@@ -126,7 +160,7 @@ const GstConfig = () => {
                             </Select>
                         </FormControl>
 
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>
                             GST Amount will be calculated as: {gstConfig.field} × {gstConfig.percentage}%
                         </Typography>
 
@@ -136,7 +170,7 @@ const GstConfig = () => {
                             fullWidth
                             onClick={applyGstCalculation}
                             disabled={loading || !gstConfig.field || !selectedCollection}
-                            startIcon={<CalculateIcon />}
+                            startIcon={<CalculateIcon/>}
                         >
                             Apply GST Calculation
                         </Button>

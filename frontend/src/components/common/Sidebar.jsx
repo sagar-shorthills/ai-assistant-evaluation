@@ -18,7 +18,7 @@ import FieldSelector from '../collection/FieldSelector';
 import GstConfig from '../gst/GstConfig';
 import { AppContext } from '../../contexts/AppContext';
 
-const drawerWidth = 280;
+export const drawerWidth = 320;
 
 const Sidebar = () => {
     const theme = useTheme();
@@ -29,16 +29,6 @@ const Sidebar = () => {
         <>
             <Toolbar />
             <Box sx={{ overflow: 'auto', p: 2 }}>
-                <List>
-                    <ListItem>
-                        <ListItemIcon>
-                            <DashboardIcon />
-                        </ListItemIcon>
-                        <ListItemText primary="Dashboard" />
-                    </ListItem>
-                </List>
-                <Divider />
-
                 <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
                     Data Selection
                 </Typography>

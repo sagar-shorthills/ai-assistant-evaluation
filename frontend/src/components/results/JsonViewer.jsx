@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { Box, Typography, Paper } from '@mui/material';
-import { JsonView } from 'react-json-view-lite';
+import { JsonView, allExpanded, darkStyles, defaultStyles } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 import { AppContext } from '../../contexts/AppContext';
 
@@ -24,16 +24,20 @@ const JsonViewer = () => {
     }
 
     return (
-        <Paper sx={{ p: 2, overflow: 'auto', maxHeight: '70vh' }}>
+        <Paper sx={{ p: 2, overflow: 'auto', maxHeight: '80vh' }}>
             <JsonView
                 data={results}
-                shouldExpandNode={() => true}
+                shouldExpandNode={allExpanded}
                 style={{
-                    fontSize: '14px',
-                    fontFamily: 'Monaco, monospace',
-                    lineHeight: '1.5',
-                    backgroundColor: 'transparent',
-                    padding: '10px'
+                    ...defaultStyles,
+                    container: {
+                        backgroundColor: 'transparent'
+                    },
+
+
+
+
+
                 }}
             />
         </Paper>

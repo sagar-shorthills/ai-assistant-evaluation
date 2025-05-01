@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from 'react';
+import React, {useContext, useMemo} from 'react';
 import {
     DataGrid,
     GridToolbar,
@@ -13,10 +13,18 @@ import {
     useTheme
 } from '@mui/material';
 import ReceiptIcon from '@mui/icons-material/Receipt';
-import { AppContext } from '../../contexts/AppContext';
+import {AppContext} from '../../contexts/AppContext';
+import {drawerWidth} from "../common/Sidebar";
+
+function getAvailableWidth(drawerWidth) {
+    if (typeof drawerWidth !== 'number') {
+        throw new Error('drawerWidth must be a number');
+    }
+    return window.innerWidth - drawerWidth;
+}
 
 const ResultsTable = () => {
-    const { results, loading, generateReceipt } = useContext(AppContext);
+    const {results, loading, generateReceipt} = useContext(AppContext);
     const theme = useTheme();
 
     // Create columns based on the first result object
@@ -24,40 +32,49 @@ const ResultsTable = () => {
         if (!results || results.length === 0) return [];
 
         const firstResult = results[0];
-        return Object.keys(firstResult).map((key) => ({
-            field: key,
-            headerName: key,
-            flex: 1,
-            minWidth: 150,
-            renderCell: (params) => {
-                // Handle different data types for display
-                const value = params.value;
-                console.log(value)
+        return Object.keys(firstResult).map((key) => {
+            // List of columns that should display currency with $ symbol
+            const currencyColumns = ['Sales', 'Sale Price', 'GST Amount', 'Total Amount'];
+            const isCurrencyColumn = currencyColumns.includes(key);
 
-                if (value === null || value === undefined) {
-                    return '';
-                } else if (typeof value === 'object') {
-                    // Handle MongoDB ObjectId or Date objects
-                    if (value && value['\$oid']) {
-                        return value['\$oid'];
-                    } else if (value && value['$date']) {
-                        return new Date(value['$date']).toLocaleString();
-                    } else if (value && value['\$numberInt']) {
-                        return parseInt(value['\$numberInt']);
-                    } else if (value && value['\$numberDouble']) {
-                        return parseFloat(value['\$numberDouble']).toFixed(2);
-                    } else {
-                        return JSON.stringify(value);
+            return {
+                field: key,
+                headerName: key,
+                width: 150,
+                hide: key === '_id',
+                renderCell: (params) => {
+                    // Handle different data types for display
+                    const value = params.value;
+
+                    if (value === null || value === undefined) {
+                        return '';
+                    } else if (typeof value === 'object') {
+                        // Handle MongoDB ObjectId or Date objects
+                        if (value && value['$oid']) {
+                            return value['$oid'];
+                        } else if (value && value['$date']) {
+                            return new Date(value['$date']).toLocaleString();
+                        } else if (value && value['$numberInt']) {
+                            return isCurrencyColumn ?
+                                `$ ${parseInt(value['$numberInt']).toFixed(2)}` :
+                                parseInt(value['$numberInt']);
+                        } else if (value && value['$numberDouble']) {
+                            return isCurrencyColumn ?
+                                `$ ${parseFloat(value['$numberDouble']).toFixed(2)}` :
+                                parseFloat(value['$numberDouble']).toFixed(2);
+                        } else {
+                            return JSON.stringify(value);
+                        }
+                    } else if (isCurrencyColumn) {
+                        // Format currency columns
+                        return typeof value === 'number' ?
+                            `$ ${value.toFixed(2)}` : value;
                     }
-                } else if (key === 'GST Amount' || key === 'Total Amount') {
-                    // Format GST and Total amounts
-                    return typeof value === 'number' ?
-                        `$ ${value.toFixed(2)}` : value;
-                }
 
-                return value;
-            }
-        }));
+                    return value;
+                }
+            };
+        });
     }, [results]);
 
     // Add action column for receipt generation
@@ -83,7 +100,7 @@ const ResultsTable = () => {
                                 size="small"
                                 color="primary"
                             >
-                                <ReceiptIcon />
+                                <ReceiptIcon/>
                             </IconButton>
                         </Tooltip>
                     );
@@ -112,7 +129,7 @@ const ResultsTable = () => {
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    height: '300px',
+                    height: '80vh',
                     width: '100%',
                     backgroundColor: alpha(theme.palette.primary.main, 0.05),
                     borderRadius: 1,
@@ -126,22 +143,21 @@ const ResultsTable = () => {
     }
 
     return (
-        <Box sx={{ height: 500, width: '100%' }}>
+        <div style={{width: '100%', height: '80vh'}}>
             <DataGrid
                 rows={rows}
                 columns={columnsWithActions}
                 loading={loading}
-                disableSelectionOnClick
+                disableRowSelectionOnClick
                 getRowHeight={() => 'auto'}
                 sx={{
-                    [`& .${gridClasses.cell}`]: {
+                    [`& .MuiDataGrid-cell`]: {
                         py: 1,
                     },
-                    border: 1,
-                    borderColor: 'divider',
-                    '& .MuiDataGrid-cell:focus': {
-                        outline: 'none',
-                    }
+                    '& .MuiDataGrid-columnHeaderTitle': {
+                        fontWeight: 'bold',
+                    },
+                    width: `${getAvailableWidth(drawerWidth) - 80}px`,
                 }}
                 initialState={{
                     pagination: {
@@ -149,20 +165,26 @@ const ResultsTable = () => {
                             pageSize: 10,
                         },
                     },
+                    columns: {
+                        columnVisibilityModel: {
+                            _id: false,
+                        },
+                    },
                 }}
                 pageSizeOptions={[5, 10, 25, 50, 100]}
-                components={{
-                    Toolbar: GridToolbar
+                slots={{
+                    toolbar: GridToolbar
                 }}
-                componentsProps={{
+                slotProps={{
                     toolbar: {
                         showQuickFilter: true,
-                        quickFilterProps: { debounceMs: 500 },
-                        printOptions: { disableToolbarButton: true }
+                        quickFilterProps: {debounceMs: 500},
+                        printOptions: {disableToolbarButton: true}
                     }
                 }}
+                autoHeight={false}
             />
-        </Box>
+        </div>
     );
 };
 
