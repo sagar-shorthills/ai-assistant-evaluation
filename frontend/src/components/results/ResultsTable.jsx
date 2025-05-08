@@ -40,19 +40,42 @@ const ResultsTable = () => {
                 'Sales', 
                 'Profit',
                 'GST Amount',
-                'Total Amount'
+                'Total Amount',
+                'taxableValue',
+                'payment.cash',
+                'payment.interest',
+                'payment.lateFee',
+                'payment.itcUtilised',
+                'tax.integrated',
+                'tax.central',
+                'tax.state',
+                'tax.cess'
             ];
             const isCurrencyColumn = currencyColumns.includes(key);
-            const isDateColumn = key === 'Date';
+            const isDateColumn = key === 'Date' || key === 'invoice.date';
+            const isObjectColumn = typeof firstResult[key] === 'object' && firstResult[key] !== null;
+
+            // Calculate column width based on content type
+            let columnWidth = 150;
+            if (isObjectColumn) {
+                columnWidth = 200;
+            } else if (isDateColumn) {
+                columnWidth = 120;
+            } else if (isCurrencyColumn) {
+                columnWidth = 130;
+            }
 
             return {
                 field: key,
-                headerName: key,
-                width: 150,
+                headerName: key.split('.').pop(), // Show only the last part of nested fields
+                width: columnWidth,
                 hide: key === '_id',
+                flex: 1,
+                minWidth: columnWidth,
                 renderCell: (params) => {
                     // Handle different data types for display
                     let value = params.value;
+                    let displayValue = '';
 
                     if (value === null || value === undefined) {
                         return '';
@@ -63,45 +86,75 @@ const ResultsTable = () => {
                     if (typeof value === 'object') {
                         // Handle MongoDB ObjectId or Date objects
                         if (value && value['$oid']) {
-                            return value['$oid'].trim();
+                            displayValue = value['$oid'].trim();
                         } else if (value && value['$date']) {
-                            return new Date(value['$date']).toLocaleString();
+                            displayValue = new Date(value['$date']).toLocaleString();
                         } else if (value && value['$numberInt']) {
                             const numValue = parseInt(value['$numberInt'].toString().trim());
-                            return isCurrencyColumn ?
+                            displayValue = isCurrencyColumn ?
                                 `$ ${numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` :
                                 numValue;
                         } else if (value && value['$numberDouble']) {
                             const numValue = parseFloat(value['$numberDouble'].toString().trim());
-                            return isCurrencyColumn ?
+                            displayValue = isCurrencyColumn ?
                                 `$ ${numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` :
                                 numValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         } else {
-                            return JSON.stringify(value);
+                            displayValue = JSON.stringify(value);
                         }
                     } else if (isCurrencyColumn) {
                         // Format currency columns
                         if (typeof value === 'string') {
                             value = parseFloat(value.trim());
                         }
-                        return typeof value === 'number' ?
+                        displayValue = typeof value === 'number' ?
                             `$ ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : value;
                     } else if (isDateColumn) {
                         // Format date column
                         try {
                             const date = new Date(value.toString().trim());
-                            return date.toLocaleDateString('en-US', {
+                            displayValue = date.toLocaleDateString('en-US', {
                                 year: 'numeric',
                                 month: 'short',
                                 day: 'numeric'
                             });
                         } catch (e) {
-                            return value;
+                            displayValue = value;
                         }
+                    } else {
+                        displayValue = value;
                     }
 
-                    return value;
-                }
+                    return (
+                        <Tooltip title={displayValue} arrow placement="top">
+                            <Typography
+                                sx={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    maxWidth: '100%',
+                                    fontSize: '0.875rem'
+                                }}
+                            >
+                                {displayValue}
+                            </Typography>
+                        </Tooltip>
+                    );
+                },
+                renderHeader: (params) => (
+                    <Tooltip title={params.field}>
+                        <Typography
+                            sx={{
+                                fontWeight: 'bold',
+                                whiteSpace: 'normal',
+                                wordWrap: 'break-word',
+                                lineHeight: 1.2
+                            }}
+                        >
+                            {params.field}
+                        </Typography>
+                    </Tooltip>
+                )
             };
         });
     }, [results]);
@@ -119,13 +172,17 @@ const ResultsTable = () => {
                 sortable: false,
                 filterable: false,
                 renderCell: (params) => {
-                    const docId = params.row._id && params.row._id['\$oid'] ?
-                        params.row._id['\$oid'] : params.row._id;
-
+                    const { companyId, period } = params.row;
+                    
                     return (
                         <Tooltip title="Generate Receipt">
                             <IconButton
-                                onClick={() => generateReceipt(docId)}
+                                onClick={() => generateReceipt({
+                                    companyId,
+                                    year: period.year,
+                                    month: period.month,
+                                    format: 'pdf'
+                                })}
                                 size="small"
                                 color="primary"
                             >
@@ -182,9 +239,25 @@ const ResultsTable = () => {
                 sx={{
                     [`& .MuiDataGrid-cell`]: {
                         py: 1,
+                        '&:focus': {
+                            outline: 'none'
+                        }
                     },
                     '& .MuiDataGrid-columnHeaderTitle': {
                         fontWeight: 'bold',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                    },
+                    '& .MuiDataGrid-columnHeaders': {
+                        backgroundColor: theme.palette.background.default,
+                        borderBottom: `2px solid ${theme.palette.divider}`
+                    },
+                    '& .MuiDataGrid-cell:focus': {
+                        outline: 'none'
+                    },
+                    '& .MuiDataGrid-row:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.04)
                     },
                     width: `${getAvailableWidth(drawerWidth) - 80}px`,
                 }}

@@ -170,11 +170,11 @@ export const AppProvider = ({ children }) => {
     }, [results, selectedCollection]);
 
     // Handler function for generating receipt
-    const generateReceipt = useCallback(async (documentId) => {
+    const generateReceipt = useCallback(async ({ companyId, year, month, format = 'pdf' }) => {
         try {
             setLoading(true);
             const response = await queryApi.generateGSTReceipt(
-                { companyId: "7d09171c-2b93-4f09-8f2d-f6cccaea47d4", year: 2025, month: 1, format: "pdf" }
+                { companyId, year, month, format }
             );
 
             // Create and download the receipt
@@ -192,7 +192,7 @@ export const AppProvider = ({ children }) => {
         } finally {
             setLoading(false);
         }
-    }, [selectedCollection, gstConfig]);
+    }, []);
 
     return (
         <AppContext.Provider
