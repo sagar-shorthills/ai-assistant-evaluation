@@ -39,8 +39,19 @@ async function connectToDatabase() {
     }
 }
 
+/**
+ * Get a specific collection by name
+ * @param {string} collectionName - Name of the collection
+ * @returns {Promise<Collection>} MongoDB collection instance
+ */
+async function getCollection(collectionName) {
+    const db = await connectToDatabase();
+    return db.collection(collectionName);
+}
+
 // Export client and connect function
 module.exports = {
     connectToDatabase,
+    getCollection,
     client
 };

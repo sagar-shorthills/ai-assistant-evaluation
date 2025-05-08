@@ -5,6 +5,7 @@ const compression = require('compression');
 const { connectToDatabase } = require('./config/db');
 const collectionRoutes = require('./routes/collectionRoutes');
 const queryRoutes = require('./routes/queryRoutes');
+const gstrRoutes = require('./routes/gstrRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const rateLimiter = require('./middleware/rateLimiter');
 require('dotenv').config();
@@ -30,6 +31,7 @@ let db;
 // Routes
 app.use('/api', collectionRoutes);
 app.use('/api', queryRoutes);
+app.use('/api/report', gstrRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

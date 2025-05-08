@@ -1,2536 +1,2254 @@
-User: MongoDB Data Exploration Tool with GST Integration
-Build a full-stack MongoDB Data Exploration Tool with GST calculation capabilities using Node.js, Express, React.js, and Material UI.
-Tech Stack Requirements
+# MongoDB Data Exploration Tool with GSTR-3B Report Generation
 
-Backend: Node.js + Express.js (latest stable versions)
-Database: MongoDB with official Node.js driver (latest version)
-Frontend: React.js (latest stable version)
-UI Components: Material UI (MUI v5+)
-State Management: React State / Context API
-File Export: xlsx, papaparse, jspdf
-Dependencies: Use only compatible and up-to-date dependencies to avoid conflicts
+I'll outline the complete architecture and implementation details for your MongoDB Data Exploration Tool with GSTR-3B report generation capabilities. Let's start by structuring the project and then dive into specific code implementations.
 
-Backend (Node.js + Express)
-MongoDB Connection
-
-Use the official MongoDB npm package to connect to MongoDB
-Store credentials securely using environment variables
-Implement connection pooling for optimal performance
-
-API Endpoints
-
-GET /collections: Return a list of available collections in the MongoDB database
-GET /fields?collection=collectionName: Fetch the first document from the specified collection and dynamically extract available fields/columns
-POST /query: Accept collection name, limit, selected fields, and GST configuration as parameters. Return query results based on the selection with calculated GST amounts
-POST /export: Accept selected data and desired format (excel, csv, json, pdf). Return the generated file ready for download
-GET /receipt/: Generate a receipt-style view for a specific document
-
-Error Handling
-
-APIs must respond with appropriate HTTP status codes and error messages
-MongoDB errors must be caught, properly logged, and handled gracefully
-Implement rate limiting to prevent abuse
-
-Frontend (React.js + Material UI)
-Layout
-
-Header: Clean, modern application title with intuitive navigation
-Left Sidebar:
-
-Application navigation menu
-Collection selector (MUI Select component)
-Numeric input for "Limit Results" (default 5) (MUI TextField)
-Dynamic multi-select widget for fields (MUI Autocomplete with multiple select)
-GST configuration section
-
-
-Main Area:
-
-Results display panel
-Toggle between Table and JSON view
-Download options
-Individual record actions (Print/Receipt view)
-
-
-
-GST Integration Features
-
-GST Configuration:
-
-Dropdown to select GST percentage (e.g., 5%, 12%, 18%, 28%)
-Field selector to choose which field to apply GST on
-Apply button to calculate GST on existing results
-
-
-GST Calculation:
-
-Add a new column "GST Amount" in results
-Calculate using formula: Selected Field Value / GST Percentage * 100
-Update JSON view to include GST Amount field
-Ensure GST calculations are included in all export formats
-
-
-Receipt Generation:
-
-Add a "Print Receipt" button for each record
-Generate a receipt-style view showing document details with GST calculation
-Allow printing and downloading of individual receipts
-Use jspdf or similar library for PDF generation
-
-
-
-Dynamic Field Selection
-
-When a user selects a collection:
-
-Fetch available fields dynamically using /fields API
-Populate fields multi-select based on the fetched fields
-Display all fields directly without requiring additional selection from dropdown
-
-
-
-Results Display
-
-Table View (MUI DataGrid or Table) by default
-
-Clear column headers
-Pagination for large result sets
-Sortable columns
-Row actions (Print Receipt)
-
-
-JSON View alternative
-
-Formatted JSON with syntax highlighting
-Collapsible sections for better readability
-
-
-Maintain results even if view toggles or downloads happen
-
-Export Functionality
-
-Primary Download Button with dropdown offering:
-
-Excel format (default)
-CSV format
-JSON format
-PDF format
-
-
-Include calculated GST amount in all exported files
-Show progress indicator during export generation
-
-State Management
-
-Persist fetched query results locally using React state
-Results should not reset unless a new query is explicitly triggered
-Save user preferences (selected collection, fields, GST settings) to browser storage
-
-UI/UX Requirements
-
-Clean, modern UI following Material UI best practices
-Intuitive layout with clear visual hierarchy
-Responsive design that works on various screen sizes
-Proper loading indicators when data is being fetched
-Toast notifications for errors and success messages
-Consistent color scheme and typography
-Accessibility compliance (WCAG 2.1 AA)
-
-Error Handling & Validation
-
-Form validation for all inputs
-Graceful handling of empty results
-Friendly error messages for failed operations
-Network error detection and retry options
-
-Project Structure & Code Quality
-
-Well-structured project directories (/backend, /frontend)
-Separation of concerns (components, services, utilities)
-Production-quality, maintainable code with proper comments
-Consistent code style and formatting
-Unit tests for critical functionality
-
-Deliverables
-
-Complete source code with clear directory structure
-.env template for MongoDB credentials (server-side only)
-Frontend setup with Material UI components
-Documentation (README) explaining:
-
-Setup instructions
-Environment configuration
-Available features
-API endpoints
-GST calculation logic
-
-
-Docker configuration for easy deployment (optional)
-
-Sample Document Structure
-json{
-  "_id": {"$oid": "6811a7051c6d4566e8bb0183"},
-  "Segment": "Government",
-  "Country": "Canada",
-  "Product": "Carretera",
-  "Discount Band": "None",
-  "Units Sold": {"$numberDouble": "1618.5"},
-  "Manufacturing Price": {"$numberInt": "3"},
-  "Sale Price": {"$numberInt": "20"},
-  "Gross Sales": {"$numberInt": "32370"},
-  "Discounts": {"$numberInt": "0"},
-  "Sales": {"$numberInt": "32370"},
-  "COGS": {"$numberInt": "16185"},
-  "Profit": {"$numberInt": "16185"},
-  "Date": {"$numberInt": "41640"},
-  "Month Number": {"$numberInt": "1"},
-  "Month Name": "January",
-  "Year": "2014"
-}
-Model: # MongoDB Data Exploration Tool with GST Integration
-
-I'll help you build a full-stack MongoDB Data Exploration Tool with GST calculation capabilities. Let me outline the complete implementation plan for your MERN stack application.
-
-## Project Setup
-
-Let's start with the project structure and initial setup:
-
-### Project Structure
+## Project Structure
 
 ```
-mongodb-data-explorer/
-├── backend/
-│   ├── config/
-│   │   └── db.js
-│   ├── controllers/
-│   │   ├── collectionController.js
-│   │   └── queryController.js
-│   ├── middleware/
-│   │   ├── errorHandler.js
-│   │   └── rateLimiter.js
-│   ├── routes/
-│   │   ├── collectionRoutes.js
-│   │   └── queryRoutes.js
-│   ├── services/
-│   │   └── mongoService.js
-│   ├── utils/
-│   │   ├── exportUtils.js
-│   │   └── gstCalculator.js
-│   ├── .env
-│   ├── .env.example
-│   ├── package.json
-│   └── server.js
-├── frontend/
+mongodb-explorer/
+├── client/                      # Frontend React application
 │   ├── public/
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── common/
-│   │   │   │   ├── Header.jsx
-│   │   │   │   ├── Sidebar.jsx
-│   │   │   │   ├── LoadingIndicator.jsx
-│   │   │   │   └── ToastNotification.jsx
-│   │   │   ├── collection/
-│   │   │   │   ├── CollectionSelector.jsx
-│   │   │   │   └── FieldSelector.jsx
-│   │   │   ├── results/
-│   │   │   │   ├── ResultsTable.jsx
-│   │   │   │   ├── JsonViewer.jsx
-│   │   │   │   └── ViewToggle.jsx
-│   │   │   ├── gst/
-│   │   │   │   ├── GstCalculator.jsx
-│   │   │   │   └── GstConfig.jsx
-│   │   │   └── export/
-│   │   │       ├── ExportOptions.jsx
-│   │   │       └── ReceiptGenerator.jsx
-│   │   ├── contexts/
-│   │   │   └── AppContext.jsx
-│   │   ├── services/
-│   │   │   ├── api.js
-│   │   │   └── storage.js
-│   │   ├── utils/
-│   │   │   ├── exportHelpers.js
-│   │   │   └── formatters.js
-│   │   ├── App.jsx
-│   │   ├── index.jsx
-│   │   └── theme.js
+│   │   ├── components/          # Reusable UI components
+│   │   ├── context/             # React context for state management
+│   │   ├── hooks/               # Custom React hooks
+│   │   ├── pages/               # Page components
+│   │   ├── services/            # API services
+│   │   ├── utils/               # Utility functions
+│   │   ├── App.js               # Main application component
+│   │   └── index.js             # Entry point
 │   ├── package.json
-│   └── .env
-├── README.md
-└── docker-compose.yml
+│   └── .env                     # Frontend environment variables
+│
+├── server/                      # Backend Node.js/Express application
+│   ├── config/                  # Configuration files
+│   ├── controllers/             # Route controllers
+│   ├── middleware/              # Express middleware
+│   ├── models/                  # MongoDB models/schema definitions
+│   ├── routes/                  # API routes
+│   ├── services/                # Business logic services
+│   ├── utils/                   # Utility functions
+│   ├── app.js                   # Express app setup
+│   ├── server.js                # Server entry point
+│   ├── package.json
+│   └── .env                     # Backend environment variables
+│
+├── .gitignore
+└── README.md                    # Project documentation
 ```
 
 ## Backend Implementation
 
-### 1. Backend Setup and MongoDB Connection
+### Environment Setup (.env)
 
-Let's start with the server setup and MongoDB connection:
-
-**backend/.env.example**
 ```
+# server/.env
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/yourdbname
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX_REQUESTS=100
+MONGODB_URI=mongodb://username:password@localhost:27017/database
+NODE_ENV=development
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=100
 ```
 
-**backend/config/db.js**
+### MongoDB Connection
+
 ```javascript
+// server/config/database.js
 const { MongoClient } = require('mongodb');
 require('dotenv').config();
 
-// MongoDB Connection Configuration
 const uri = process.env.MONGODB_URI;
-const client = new MongoClient(uri, {
+const options = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  maxPoolSize: 10 // Connection pooling for better performance
-});
+  maxPoolSize: 10
+};
 
-// Connection function
-async function connectToDatabase() {
+let client;
+let dbConnection;
+
+const connectDB = async () => {
   try {
-    await client.connect();
-    console.log('Successfully connected to MongoDB');
-    return client.db();
+    if (!client) {
+      client = new MongoClient(uri, options);
+      await client.connect();
+      dbConnection = client.db();
+      console.log('MongoDB connection established successfully');
+    }
+    return dbConnection;
   } catch (error) {
-    console.error('Error connecting to MongoDB:', error);
+    console.error('MongoDB connection error:', error);
     process.exit(1);
   }
-}
-
-// Export client and connect function
-module.exports = {
-  connectToDatabase,
-  client
 };
+
+module.exports = { connectDB };
 ```
 
-**backend/server.js**
+### API Routes Setup
+
 ```javascript
+// server/routes/index.js
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const { connectToDatabase } = require('./config/db');
-const collectionRoutes = require('./routes/collectionRoutes');
-const queryRoutes = require('./routes/queryRoutes');
-const errorHandler = require('./middleware/errorHandler');
-const rateLimiter = require('./middleware/rateLimiter');
-require('dotenv').config();
+const router = express.Router();
+const collectionsController = require('../controllers/collections.controller');
+const queryController = require('../controllers/query.controller');
+const exportController = require('../controllers/export.controller');
+const reportController = require('../controllers/report.controller');
 
-const app = express();
-const PORT = process.env.PORT || 5000;
+// Collection routes
+router.get('/collections', collectionsController.getCollections);
+router.get('/fields', collectionsController.getFields);
 
-// Middleware
-app.use(helmet());
-app.use(compression());
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(rateLimiter);
+// Query routes
+router.post('/query', queryController.executeQuery);
 
-// Initialize database connection
-let db;
-(async function initializeApp() {
-  db = await connectToDatabase();
-  app.locals.db = db;
-})();
+// Export routes
+router.post('/export', exportController.exportData);
 
-// Routes
-app.use('/api', collectionRoutes);
-app.use('/api', queryRoutes);
+// Report routes
+router.post('/report/gstr3b', reportController.generateGSTR3B);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Server is running' });
-});
-
-// Error handler middleware (must be last)
-app.use(errorHandler);
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+module.exports = router;
 ```
 
-### 2. Backend Middleware
+### Controllers Implementation
 
-**backend/middleware/errorHandler.js**
 ```javascript
-const errorHandler = (err, req, res, next) => {
-  console.error(err.stack);
+// server/controllers/collections.controller.js
+const { connectDB } = require('../config/database');
 
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
-
-  res.status(statusCode).json({
-    error: {
-      message,
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-    }
-  });
-};
-
-module.exports = errorHandler;
-```
-
-**backend/middleware/rateLimiter.js**
-```javascript
-const rateLimit = require('express-rate-limit');
-require('dotenv').config();
-
-const rateLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000, // 1 minute
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests, please try again after some time.',
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-});
-
-module.exports = rateLimiter;
-```
-
-### 3. Backend Services and Controllers
-
-**backend/services/mongoService.js**
-```javascript
-// MongoDB service for reusable database operations
-
-/**
- * Gets all collections in the database
- * @param {Object} db - MongoDB database instance
- * @returns {Promise<Array>} - List of collection names
- */
-async function getCollections(db) {
+exports.getCollections = async (req, res) => {
   try {
+    const db = await connectDB();
     const collections = await db.listCollections().toArray();
-    return collections.map(collection => collection.name);
+    const collectionNames = collections.map(collection => collection.name);
+    res.status(200).json({ collections: collectionNames });
   } catch (error) {
     console.error('Error fetching collections:', error);
-    throw error;
+    res.status(500).json({ error: 'Failed to fetch collections' });
   }
-}
+};
 
-/**
- * Gets the fields from a sample document in the collection
- * @param {Object} db - MongoDB database instance
- * @param {String} collectionName - Name of the collection
- * @returns {Promise<Object>} - Fields from the first document
- */
-async function getCollectionFields(db, collectionName) {
+exports.getFields = async (req, res) => {
+  const { collection } = req.query;
+
+  if (!collection) {
+    return res.status(400).json({ error: 'Collection name is required' });
+  }
+
   try {
-    const collection = db.collection(collectionName);
-    const sampleDoc = await collection.findOne({});
+    const db = await connectDB();
+    // Get sample document to determine fields
+    const sampleDocument = await db.collection(collection).findOne({});
 
-    if (!sampleDoc) {
-      return { error: 'No documents found in collection' };
+    if (!sampleDocument) {
+      return res.status(404).json({ error: 'Collection is empty' });
     }
 
-    return { fields: Object.keys(sampleDoc) };
-  } catch (error) {
-    console.error(`Error fetching fields for collection ${collectionName}:`, error);
-    throw error;
-  }
-}
+    const fields = Object.keys(sampleDocument).map(key => ({
+      name: key,
+      type: typeof sampleDocument[key]
+    }));
 
-/**
- * Executes a query against the specified collection
- * @param {Object} db - MongoDB database instance
- * @param {String} collectionName - Name of the collection
- * @param {Array} selectedFields - Fields to include in results
- * @param {Number} limit - Maximum number of documents to return
- * @returns {Promise<Array>} - Query results
- */
-async function executeQuery(db, collectionName, selectedFields, limit = 5) {
+    res.status(200).json({ fields });
+  } catch (error) {
+    console.error(`Error fetching fields for collection ${collection}:`, error);
+    res.status(500).json({ error: 'Failed to fetch collection fields' });
+  }
+};
+```
+
+```javascript
+// server/controllers/query.controller.js
+const { connectDB } = require('../config/database');
+
+exports.executeQuery = async (req, res) => {
+  const { collectionName, limit = 100, fields, filters = {} } = req.body;
+
+  if (!collectionName) {
+    return res.status(400).json({ error: 'Collection name is required' });
+  }
+
   try {
+    const db = await connectDB();
     const collection = db.collection(collectionName);
 
-    // Create projection object for selected fields
+    // Build projection based on selected fields
     const projection = {};
-    if (selectedFields && selectedFields.length > 0) {
-      selectedFields.forEach(field => {
+    if (fields && fields.length > 0) {
+      fields.forEach(field => {
         projection[field] = 1;
       });
     }
 
-    // Execute query with projection and limit
-    const results = await collection
-      .find({})
-      .project(projection)
-      .limit(parseInt(limit))
-      .toArray();
-
-    return results;
-  } catch (error) {
-    console.error(`Error executing query on collection ${collectionName}:`, error);
-    throw error;
-  }
-}
-
-module.exports = {
-  getCollections,
-  getCollectionFields,
-  executeQuery
-};
-```
-
-**backend/controllers/collectionController.js**
-```javascript
-const { getCollections, getCollectionFields } = require('../services/mongoService');
-
-/**
- * Get all available collections
- */
-exports.getAllCollections = async (req, res, next) => {
-  try {
-    const db = req.app.locals.db;
-    const collections = await getCollections(db);
-
-    res.status(200).json({
-      success: true,
-      data: collections
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Get fields from a collection
- */
-exports.getFields = async (req, res, next) => {
-  try {
-    const { collection } = req.query;
-
-    if (!collection) {
-      return res.status(400).json({
-        success: false,
-        error: 'Collection name is required'
-      });
-    }
-
-    const db = req.app.locals.db;
-    const result = await getCollectionFields(db, collection);
-
-    if (result.error) {
-      return res.status(404).json({
-        success: false,
-        error: result.error
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: result.fields
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-```
-
-**backend/utils/gstCalculator.js**
-```javascript
-/**
- * Calculate GST amount based on field value and GST percentage
- * @param {Number} fieldValue - The value to apply GST on
- * @param {Number} gstPercentage - GST percentage (5, 12, 18, 28)
- * @returns {Number} - Calculated GST amount
- */
-function calculateGST(fieldValue, gstPercentage) {
-  if (typeof fieldValue !== 'number' || isNaN(fieldValue)) {
-    return 0;
-  }
-
-  // GST calculation formula
-  return parseFloat((fieldValue * gstPercentage / 100).toFixed(2));
-}
-
-/**
- * Apply GST calculation to query results
- * @param {Array} results - Query results from MongoDB
- * @param {String} gstField - Field name to apply GST on
- * @param {Number} gstPercentage - GST percentage (5, 12, 18, 28)
- * @returns {Array} - Results with GST amount added
- */
-function applyGST(results, gstField, gstPercentage) {
-  if (!results || !Array.isArray(results) || !gstField || !gstPercentage) {
-    return results;
-  }
-
-  return results.map(item => {
-    const fieldValue = parseFloat(item[gstField]);
-    const gstAmount = calculateGST(fieldValue, gstPercentage);
-
-    return {
-      ...item,
-      'GST Amount': gstAmount,
-      'Total Amount': parseFloat((fieldValue + gstAmount).toFixed(2))
+    const query = filters || {};
+    const options = {
+      limit: parseInt(limit, 10),
+      projection: Object.keys(projection).length > 0 ? projection : undefined
     };
-  });
-}
 
-module.exports = {
-  calculateGST,
-  applyGST
-};
-```
-
-**backend/controllers/queryController.js**
-```javascript
-const { executeQuery } = require('../services/mongoService');
-const { applyGST } = require('../utils/gstCalculator');
-const exportUtils = require('../utils/exportUtils');
-
-/**
- * Execute query and return results with optional GST calculation
- */
-exports.executeQueryWithGST = async (req, res, next) => {
-  try {
-    const { collection, fields, limit, gstConfig } = req.body;
-
-    if (!collection) {
-      return res.status(400).json({
-        success: false,
-        error: 'Collection name is required'
-      });
-    }
-
-    const db = req.app.locals.db;
-    let results = await executeQuery(db, collection, fields, limit || 5);
-
-    // Apply GST calculation if GST config is provided
-    if (gstConfig && gstConfig.enabled && gstConfig.field && gstConfig.percentage) {
-      results = applyGST(results, gstConfig.field, gstConfig.percentage);
-    }
+    const results = await collection.find(query, options).toArray();
 
     res.status(200).json({
-      success: true,
       count: results.length,
       data: results
     });
   } catch (error) {
-    next(error);
+    console.error('Error executing query:', error);
+    res.status(500).json({ error: 'Failed to execute query' });
   }
 };
+```
 
-/**
- * Export data in the requested format
- */
-exports.exportData = async (req, res, next) => {
+```javascript
+// server/controllers/export.controller.js
+const ExcelJS = require('exceljs');
+const { Parser } = require('json2csv');
+const { PDFDocument, rgb } = require('pdf-lib');
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+
+exports.exportData = async (req, res) => {
   try {
-    const { data, format, filename = 'export' } = req.body;
+    const { data, format } = req.body;
 
-    if (!data || !Array.isArray(data) || !format) {
-      return res.status(400).json({
-        success: false,
-        error: 'Valid data array and export format are required'
-      });
+    if (!data || !Array.isArray(data)) {
+      return res.status(400).json({ error: 'Data is required and must be an array' });
     }
 
-    let result;
-    let mimeType;
+    if (!format || !['excel', 'csv', 'json', 'pdf'].includes(format)) {
+      return res.status(400).json({ error: 'Valid format (excel, csv, json, pdf) is required' });
+    }
 
-    switch (format.toLowerCase()) {
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir);
+    }
+
+    const fileName = `export-${uuidv4()}`;
+    const filePath = path.join(tempDir, fileName);
+
+    switch (format) {
       case 'excel':
-        result = await exportUtils.exportToExcel(data, filename);
-        mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-        break;
-      case 'csv':
-        result = exportUtils.exportToCSV(data, filename);
-        mimeType = 'text/csv';
-        break;
-      case 'json':
-        result = JSON.stringify(data, null, 2);
-        mimeType = 'application/json';
-        break;
-      case 'pdf':
-        result = await exportUtils.exportToPDF(data, filename);
-        mimeType = 'application/pdf';
-        break;
-      default:
-        return res.status(400).json({
-          success: false,
-          error: 'Unsupported export format'
+        await exportToExcel(data, `${filePath}.xlsx`);
+        res.download(`${filePath}.xlsx`, 'export.xlsx', () => {
+          fs.unlinkSync(`${filePath}.xlsx`);
         });
-    }
+        break;
 
-    res.status(200).json({
-      success: true,
-      data: result,
-      mimeType,
-      filename: `${filename}.${format.toLowerCase() === 'excel' ? 'xlsx' : format.toLowerCase()}`
-    });
+      case 'csv':
+        await exportToCSV(data, `${filePath}.csv`);
+        res.download(`${filePath}.csv`, 'export.csv', () => {
+          fs.unlinkSync(`${filePath}.csv`);
+        });
+        break;
+
+      case 'json':
+        await exportToJSON(data, `${filePath}.json`);
+        res.download(`${filePath}.json`, 'export.json', () => {
+          fs.unlinkSync(`${filePath}.json`);
+        });
+        break;
+
+      case 'pdf':
+        await exportToPDF(data, `${filePath}.pdf`);
+        res.download(`${filePath}.pdf`, 'export.pdf', () => {
+          fs.unlinkSync(`${filePath}.pdf`);
+        });
+        break;
+    }
   } catch (error) {
-    next(error);
+    console.error('Error exporting data:', error);
+    res.status(500).json({ error: 'Failed to export data' });
   }
 };
 
-/**
- * Generate receipt for a specific record
- */
-exports.generateReceipt = async (req, res, next) => {
-  try {
-    const { documentId, collection } = req.params;
-    const { gstConfig } = req.body;
+async function exportToExcel(data, filePath) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Data');
 
-    if (!documentId || !collection) {
-      return res.status(400).json({
-        success: false,
-        error: 'Document ID and collection name are required'
-      });
-    }
-
-    const db = req.app.locals.db;
-    const coll = db.collection(collection);
-
-    // Try to convert to ObjectId if it follows the format
-    let query;
-    if (/^[0-9a-fA-F]{24}$/.test(documentId)) {
-      const { ObjectId } = require('mongodb');
-      query = { _id: new ObjectId(documentId) };
-    } else {
-      query = { _id: documentId };
-    }
-
-    const document = await coll.findOne(query);
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        error: 'Document not found'
-      });
-    }
-
-    // Calculate GST if config provided
-    let documentWithGST = { ...document };
-    if (gstConfig && gstConfig.enabled && gstConfig.field && gstConfig.percentage) {
-      const fieldValue = parseFloat(document[gstConfig.field]);
-      const gstAmount = (fieldValue * gstConfig.percentage / 100);
-
-      documentWithGST = {
-        ...documentWithGST,
-        'GST Percentage': gstConfig.percentage,
-        'GST Amount': parseFloat(gstAmount.toFixed(2)),
-        'Total Amount': parseFloat((fieldValue + gstAmount).toFixed(2))
-      };
-    }
-
-    // Generate PDF receipt
-    const pdfBuffer = await exportUtils.generateReceipt(documentWithGST);
-
-    res.status(200).json({
-      success: true,
-      data: pdfBuffer,
-      mimeType: 'application/pdf',
-      filename: `receipt-${documentId}.pdf`
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-```
-
-**backend/utils/exportUtils.js**
-```javascript
-const XLSX = require('xlsx');
-const Papa = require('papaparse');
-const { jsPDF } = require('jspdf');
-const autoTable = require('jspdf-autotable');
-
-/**
- * Export data to Excel format
- * @param {Array} data - Data to export
- * @param {String} filename - Base filename
- * @returns {String} - Base64 encoded Excel file
- */
-async function exportToExcel(data, filename) {
-  try {
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(data);
-
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
-
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
-
-    // Convert buffer to base64
-    return excelBuffer.toString('base64');
-  } catch (error) {
-    console.error('Error exporting to Excel:', error);
-    throw error;
-  }
-}
-
-/**
- * Export data to CSV format
- * @param {Array} data - Data to export
- * @returns {String} - CSV string
- */
-function exportToCSV(data) {
-  try {
-    return Papa.unparse(data);
-  } catch (error) {
-    console.error('Error exporting to CSV:', error);
-    throw error;
-  }
-}
-
-/**
- * Export data to PDF format
- * @param {Array} data - Data to export
- * @param {String} filename - Base filename
- * @returns {String} - Base64 encoded PDF
- */
-async function exportToPDF(data, filename) {
-  try {
-    const doc = new jsPDF();
-
-    // Add title
-    doc.setFontSize(16);
-    doc.text(`${filename} - Data Export`, 14, 15);
-
-    // Create table data
+  // Add headers
+  if (data.length > 0) {
     const headers = Object.keys(data[0]);
-    const rows = data.map(item => headers.map(header => item[header]));
+    worksheet.addRow(headers);
 
-    // Add table to document
-    doc.autoTable({
-      head: [headers],
-      body: rows,
-      startY: 20,
-      margin: { top: 20 },
-      styles: { overflow: 'linebreak' },
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-      didDrawPage: (data) => {
-        // Add page number at the bottom
-        doc.setFontSize(10);
-        doc.text(
-          `Page ${doc.internal.getNumberOfPages()}`,
-          data.settings.margin.left,
-          doc.internal.pageSize.height - 10
-        );
-      }
-    });
-
-    // Return base64 encoded PDF
-    return doc.output('datauristring').split(',')[1];
-  } catch (error) {
-    console.error('Error exporting to PDF:', error);
-    throw error;
-  }
-}
-
-/**
- * Generate receipt for specific document
- * @param {Object} document - Document data
- * @returns {String} - Base64 encoded PDF receipt
- */
-async function generateReceipt(document) {
-  try {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    // Add header
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('RECEIPT', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
-
-    // Add date and receipt ID
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    const today = new Date().toLocaleDateString();
-    doc.text(`Date: ${today}`, 20, 30);
-    doc.text(`Receipt ID: ${document._id}`, 20, 35);
-
-    // Add horizontal line
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.5);
-    doc.line(20, 40, 190, 40);
-
-    // Add item details
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Item Details', 20, 50);
-
-    // Create table for document data
-    const tableData = [];
-    for (const [key, value] of Object.entries(document)) {
-      if (key !== '_id' && key !== 'GST Amount' && key !== 'GST Percentage' && key !== 'Total Amount') {
-        tableData.push([key, String(value)]);
-      }
-    }
-
-    // Add main data table
-    doc.autoTable({
-      startY: 55,
-      head: [['Field', 'Value']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: {
-        fillColor: [66, 66, 66],
-        textColor: 255
-      }
-    });
-
-    // Add GST details if available
-    if (document['GST Amount'] !== undefined) {
-      const finalY = doc.lastAutoTable.finalY + 10;
-
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('GST Details', 20, finalY);
-
-      const gstTableData = [
-        ['GST Percentage', `${document['GST Percentage']}%`],
-        ['GST Amount', `₹${document['GST Amount']}`],
-        ['Total Amount', `₹${document['Total Amount']}`]
-      ];
-
-      // Add GST table
-      doc.autoTable({
-        startY: finalY + 5,
-        body: gstTableData,
-        theme: 'grid',
-        styles: {
-          cellPadding: 5
-        }
+    // Add data rows
+    data.forEach(item => {
+      const row = [];
+      headers.forEach(header => {
+        row.push(item[header] !== undefined ? item[header] : '');
       });
+      worksheet.addRow(row);
+    });
+  }
+
+  await workbook.xlsx.writeFile(filePath);
+}
+
+async function exportToCSV(data, filePath) {
+  if (data.length === 0) {
+    fs.writeFileSync(filePath, '');
+    return;
+  }
+
+  const fields = Object.keys(data[0]);
+  const parser = new Parser({ fields });
+  const csv = parser.parse(data);
+  fs.writeFileSync(filePath, csv);
+}
+
+async function exportToJSON(data, filePath) {
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
+async function exportToPDF(data, filePath) {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([842, 595]); // A4 landscape
+
+  let yOffset = 550;
+  const xOffset = 50;
+  const lineHeight = 20;
+
+  if (data.length > 0) {
+    // Headers
+    const headers = Object.keys(data[0]);
+
+    page.drawText('Data Export', {
+      x: xOffset,
+      y: yOffset + 30,
+      size: 16
+    });
+
+    yOffset -= 20;
+
+    // Draw header row
+    headers.forEach((header, index) => {
+      page.drawText(header, {
+        x: xOffset + (index * 100),
+        y: yOffset,
+        size: 12
+      });
+    });
+
+    yOffset -= lineHeight;
+
+    // Draw data rows
+    data.forEach((item, rowIndex) => {
+      if (yOffset < 50) {
+        // Add new page if needed
+        yOffset = 550;
+        const newPage = pdfDoc.addPage([842, 595]);
+        page = newPage;
+      }
+
+      headers.forEach((header, index) => {
+        const value = item[header] !== undefined ? String(item[header]) : '';
+        page.drawText(value.substring(0, 15), { // Limit text length
+          x: xOffset + (index * 100),
+          y: yOffset,
+          size: 10
+        });
+      });
+
+      yOffset -= lineHeight;
+    });
+  } else {
+    page.drawText('No data available', {
+      x: xOffset,
+      y: yOffset,
+      size: 12
+    });
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  fs.writeFileSync(filePath, pdfBytes);
+}
+```
+
+### GSTR-3B Report Generation
+
+```javascript
+// server/controllers/report.controller.js
+const { connectDB } = require('../config/database');
+const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+
+exports.generateGSTR3B = async (req, res) => {
+  const { companyId, year, month } = req.body;
+
+  if (!companyId || !year || !month) {
+    return res.status(400).json({ error: 'Company ID, year, and month are required' });
+  }
+
+  try {
+    const db = await connectDB();
+
+    // Get company details
+    const company = await db.collection('companies').findOne({ _id: companyId });
+
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
     }
 
-    // Add footer
-    const pageHeight = doc.internal.pageSize.getHeight();
-    doc.setFontSize(10);
-    doc.text('Thank you for your business!', doc.internal.pageSize.getWidth() / 2, pageHeight - 20, { align: 'center' });
+    // Define date range for the month
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
 
-    // Return base64 string
-    return doc.output('datauristring').split(',')[1];
+    // Get all transactions for the period
+    const transactions = await db.collection('transactions').find({
+      companyId,
+      date: { $gte: startDate, $lte: endDate }
+    }).toArray();
+
+    // Generate GSTR-3B report data
+    const reportData = calculateGSTR3BData(transactions);
+
+    // Prepare final report with company details
+    const finalReport = {
+      company: {
+        name: company.name,
+        gstin: company.gstin,
+        address: company.address,
+      },
+      period: {
+        month,
+        year
+      },
+      sections: reportData
+    };
+
+    // Generate PDF
+    const pdfPath = await generateGSTR3BPDF(finalReport);
+
+    res.status(200).json({
+      reportData: finalReport,
+      pdfUrl: `/download?file=${path.basename(pdfPath)}`
+    });
   } catch (error) {
-    console.error('Error generating receipt:', error);
-    throw error;
+    console.error('Error generating GSTR-3B report:', error);
+    res.status(500).json({ error: 'Failed to generate GSTR-3B report' });
+  }
+};
+
+function calculateGSTR3BData(transactions) {
+  // Initialize report data structure
+  const reportData = {
+    '3.1': { // Outward supplies
+      a: { taxableValue: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 }, // Outward taxable supplies (zero rated)
+      b: { taxableValue: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 }, // Outward taxable supplies (other than zero rated)
+      c: { taxableValue: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 }, // Other outward supplies (nil rated, exempted)
+      d: { taxableValue: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 }, // Inward supplies (liable to reverse charge)
+      e: { taxableValue: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 }, // Non-GST outward supplies
+    },
+    '4': { // Eligible ITC
+      a: { igst: 0, cgst: 0, sgst: 0, cess: 0 }, // Import of goods
+      b: { igst: 0, cgst: 0, sgst: 0, cess: 0 }, // Import of services
+      c: { igst: 0, cgst: 0, sgst: 0, cess: 0 }, // ITC on reverse charge
+      d: { igst: 0, cgst: 0, sgst: 0, cess: 0 }, // ITC on inward supplies from ISD
+      e: { igst: 0, cgst: 0, sgst: 0, cess: 0 }, // All other ITC
+    },
+    '5': { // Exempt, nil-rated and non-GST inward supplies
+      a: { intraState: 0, interState: 0 }, // From a supplier under composition scheme, exempt and nil rated
+      b: { intraState: 0, interState: 0 }, // Non-GST supply
+    },
+    '6.1': { // Payment of tax
+      igst: { tax: 0, interest: 0, lateFee: 0, penalty: 0 },
+      cgst: { tax: 0, interest: 0, lateFee: 0, penalty: 0 },
+      sgst: { tax: 0, interest: 0, lateFee: 0, penalty: 0 },
+      cess: { tax: 0, interest: 0, lateFee: 0, penalty: 0 },
+    }
+  };
+
+  // Process each transaction
+  transactions.forEach(transaction => {
+    // Process based on transaction type
+    if (transaction.type === 'outward') {
+      processOutwardSupplies(transaction, reportData);
+    } else if (transaction.type === 'inward') {
+      processInwardSupplies(transaction, reportData);
+    } else if (transaction.type === 'payment') {
+      processPayment(transaction, reportData);
+    }
+  });
+
+  return reportData;
+}
+
+function processOutwardSupplies(transaction, reportData) {
+  const { subType, taxableValue, igst = 0, cgst = 0, sgst = 0, cess = 0 } = transaction;
+
+  switch (subType) {
+    case 'zeroRated':
+      reportData['3.1'].a.taxableValue += taxableValue || 0;
+      reportData['3.1'].a.igst += igst || 0;
+      reportData['3.1'].a.cgst += cgst || 0;
+      reportData['3.1'].a.sgst += sgst || 0;
+      reportData['3.1'].a.cess += cess || 0;
+      break;
+    case 'taxable':
+      reportData['3.1'].b.taxableValue += taxableValue || 0;
+      reportData['3.1'].b.igst += igst || 0;
+      reportData['3.1'].b.cgst += cgst || 0;
+      reportData['3.1'].b.sgst += sgst || 0;
+      reportData['3.1'].b.cess += cess || 0;
+      break;
+    case 'nilRated':
+    case 'exempt':
+      reportData['3.1'].c.taxableValue += taxableValue || 0;
+      break;
+    case 'nonGST':
+      reportData['3.1'].e.taxableValue += taxableValue || 0;
+      break;
   }
 }
 
-module.exports = {
-  exportToExcel,
-  exportToCSV,
-  exportToPDF,
-  generateReceipt
-};
+function processInwardSupplies(transaction, reportData) {
+  const {
+    subType, taxableValue, igst = 0, cgst = 0, sgst = 0, cess = 0,
+    reverseCharge, intraState
+  } = transaction;
+
+  // Check if it's a reverse charge transaction
+  if (reverseCharge) {
+    reportData['3.1'].d.taxableValue += taxableValue || 0;
+    reportData['3.1'].d.igst += igst || 0;
+    reportData['3.1'].d.cgst += cgst || 0;
+    reportData['3.1'].d.sgst += sgst || 0;
+    reportData['3.1'].d.cess += cess || 0;
+
+    // Add to ITC on reverse charge
+    reportData['4'].c.igst += igst || 0;
+    reportData['4'].c.cgst += cgst || 0;
+    reportData['4'].c.sgst += sgst || 0;
+    reportData['4'].c.cess += cess || 0;
+    return;
+  }
+
+  // Process based on sub-type
+  switch (subType) {
+    case 'importGoods':
+      reportData['4'].a.igst += igst || 0;
+      reportData['4'].a.cess += cess || 0;
+      break;
+    case 'importServices':
+      reportData['4'].b.igst += igst || 0;
+      reportData['4'].b.cess += cess || 0;
+      break;
+    case 'fromISD':
+      reportData['4'].d.igst += igst || 0;
+      reportData['4'].d.cgst += cgst || 0;
+      reportData['4'].d.sgst += sgst || 0;
+      reportData['4'].d.cess += cess || 0;
+      break;
+    case 'regular':
+      reportData['4'].e.igst += igst || 0;
+      reportData['4'].e.cgst += cgst || 0;
+      reportData['4'].e.sgst += sgst || 0;
+      reportData['4'].e.cess += cess || 0;
+      break;
+    case 'composition':
+    case 'exempt':
+    case 'nilRated':
+      if (intraState) {
+        reportData['5'].a.intraState += taxableValue || 0;
+      } else {
+        reportData['5'].a.interState += taxableValue || 0;
+      }
+      break;
+    case 'nonGST':
+      if (intraState) {
+        reportData['5'].b.intraState += taxableValue || 0;
+      } else {
+        reportData['5'].b.interState += taxableValue || 0;
+      }
+      break;
+  }
+}
+
+function processPayment(transaction, reportData) {
+  const {
+    igstTax = 0, igstInterest = 0, igstLateFee = 0, igstPenalty = 0,
+    cgstTax = 0, cgstInterest = 0, cgstLateFee = 0, cgstPenalty = 0,
+    sgstTax = 0, sgstInterest = 0, sgstLateFee = 0, sgstPenalty = 0,
+    cessTax = 0, cessInterest = 0, cessLateFee = 0, cessPenalty = 0
+  } = transaction;
+
+  // Update payment section
+  reportData['6.1'].igst.tax += igstTax || 0;
+  reportData['6.1'].igst.interest += igstInterest || 0;
+  reportData['6.1'].igst.lateFee += igstLateFee || 0;
+  reportData['6.1'].igst.penalty += igstPenalty || 0;
+
+  reportData['6.1'].cgst.tax += cgstTax || 0;
+  reportData['6.1'].cgst.interest += cgstInterest || 0;
+  reportData['6.1'].cgst.lateFee += cgstLateFee || 0;
+  reportData['6.1'].cgst.penalty += cgstPenalty || 0;
+
+  reportData['6.1'].sgst.tax += sgstTax || 0;
+  reportData['6.1'].sgst.interest += sgstInterest || 0;
+  reportData['6.1'].sgst.lateFee += sgstLateFee || 0;
+  reportData['6.1'].sgst.penalty += sgstPenalty || 0;
+
+  reportData['6.1'].cess.tax += cessTax || 0;
+  reportData['6.1'].cess.interest += cessInterest || 0;
+  reportData['6.1'].cess.lateFee += cessLateFee || 0;
+  reportData['6.1'].cess.penalty += cessPenalty || 0;
+}
+
+async function generateGSTR3BPDF(reportData) {
+  const pdfDoc = await PDFDocument.create();
+  const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const page = pdfDoc.addPage([612, 792]); // Letter size
+
+  let yOffset = 750;
+  const xOffset = 50;
+  const lineHeight = 20;
+
+  // Header
+  page.drawText('GSTR-3B Report', {
+    x: 250,
+    y: yOffset,
+    size: 16,
+    font: helveticaBold
+  });
+  yOffset -= lineHeight * 2;
+
+  // Company info
+  page.drawText(`Company: ${reportData.company.name}`, {
+    x: xOffset,
+    y: yOffset,
+    size: 12,
+    font: helveticaBold
+  });
+  yOffset -= lineHeight;
+
+  page.drawText(`GSTIN: ${reportData.company.gstin}`, {
+    x: xOffset,
+    y: yOffset,
+    size: 12,
+    font: helveticaFont
+  });
+  yOffset -= lineHeight;
+
+  page.drawText(`Address: ${reportData.company.address}`, {
+    x: xOffset,
+    y: yOffset,
+    size: 12,
+    font: helveticaFont
+  });
+  yOffset -= lineHeight;
+
+  page.drawText(`Reporting Period: ${reportData.period.month}/${reportData.period.year}`, {
+    x: xOffset,
+    y: yOffset,
+    size: 12,
+    font: helveticaFont
+  });
+  yOffset -= lineHeight * 2;
+
+  // Section 3.1 - Outward Supplies
+  page.drawText('3.1 Details of Outward Supplies and inward supplies liable to reverse charge', {
+    x: xOffset,
+    y: yOffset,
+    size: 12,
+    font: helveticaBold
+  });
+  yOffset -= lineHeight * 1.5;
+
+  // Table headers for section 3.1
+  const section3Headers = ['Nature of Supplies', 'Taxable Value', 'IGST', 'CGST', 'SGST', 'Cess'];
+  const section3ColumnWidths = [200, 80, 60, 60, 60, 60];
+  drawTableHeaders(page, section3Headers, section3ColumnWidths, xOffset, yOffset, helveticaBold);
+  yOffset -= lineHeight;
+
+  // Table data for section 3.1
+  const section3Data = [
+    ['(a) Outward taxable supplies (zero rated)', reportData.sections['3.1'].a.taxableValue, reportData.sections['3.1'].a.igst, reportData.sections['3.1'].a.cgst, reportData.sections['3.1'].a.sgst, reportData.sections['3.1'].a.cess],
+    ['(b) Outward taxable supplies (other than zero rated)', reportData.sections['3.1'].b.taxableValue, reportData.sections['3.1'].b.igst, reportData.sections['3.1'].b.cgst, reportData.sections['3.1'].b.sgst, reportData.sections['3.1'].b.cess],
+    ['(c) Other outward supplies (nil rated, exempted)', reportData.sections['3.1'].c.taxableValue, reportData.sections['3.1'].c.igst, reportData.sections['3.1'].c.cgst, reportData.sections['3.1'].c.sgst, reportData.sections['3.1'].c.cess],
+    ['(d) Inward supplies (liable to reverse charge)', reportData.sections['3.1'].d.taxableValue, reportData.sections['3.1'].d.igst, reportData.sections['3.1'].d.cgst, reportData.sections['3.1'].d.sgst, reportData.sections['3.1'].d.cess],
+    ['(e) Non-GST outward supplies', reportData.sections['3.1'].e.taxableValue, reportData.sections['3.1'].e.igst, reportData.sections['3.1'].e.cgst, reportData.sections['3.1'].e.sgst, reportData.sections['3.1'].e.cess]
+  ];
+
+  section3Data.forEach(row => {
+    drawTableRow(page, row, section3ColumnWidths, xOffset, yOffset, helveticaFont);
+    yOffset -= lineHeight;
+  });
+  yOffset -= lineHeight;
+
+  // Section 4 - Eligible ITC
+  page.drawText('4. Eligible ITC', {
+    x: xOffset,
+    y: yOffset,
+    size: 12,
+    font: helveticaBold
+  });
+  yOffset -= lineHeight * 1.5;
+
+  // Table headers for section 4
+  const section4Headers = ['Details', 'IGST', 'CGST', 'SGST', 'Cess'];
+  const section4ColumnWidths = [200, 80, 80, 80, 80];
+  drawTableHeaders(page, section4Headers, section4ColumnWidths, xOffset, yOffset, helveticaBold);
+  yOffset -= lineHeight;
+
+  // Table data for section 4
+  const section4Data = [
+    ['(a) Import of goods', reportData.sections['4'].a.igst, reportData.sections['4'].a.cgst, reportData.sections['4'].a.sgst, reportData.sections['4'].a.cess],
+    ['(b) Import of services', reportData.sections['4'].b.igst, reportData.sections['4'].b.cgst, reportData.sections['4'].b.sgst, reportData.sections['4'].b.cess],
+    ['(c) ITC on reverse charge', reportData.sections['4'].c.igst, reportData.sections['4'].c.cgst, reportData.sections['4'].c.sgst, reportData.sections['4'].c.cess],
+    ['(d) ITC on inward supplies from ISD', reportData.sections['4'].d.igst, reportData.sections['4'].d.cgst, reportData.sections['4'].d.sgst, reportData.sections['4'].d.cess],
+    ['(e) All other ITC', reportData.sections['4'].e.igst, reportData.sections['4'].e.cgst, reportData.sections['4'].e.sgst, reportData.sections['4'].e.cess]
+  ];
+
+  section4Data.forEach(row => {
+    drawTableRow(page, row, section4ColumnWidths, xOffset, yOffset, helveticaFont);
+    yOffset -= lineHeight;
+  });
+  yOffset -= lineHeight;
+
+  // Check if we need a new page
+  if (yOffset < 200) {
+    const newPage = pdfDoc.addPage([612, 792]);
+    page = newPage;
+    yOffset = 750;
+  }
+
+  // Section 5 - Exempt, nil-rated and non-GST inward supplies
+  page.drawText('5. Exempt, nil-rated and non-GST inward supplies', {
+    x: xOffset,
+    y: yOffset,
+    size: 12,
+    font: helveticaBold
+  });
+  yOffset -= lineHeight * 1.5;
+
+  // Table headers for section 5
+  const section5Headers = ['Details', 'Inter-State Supplies', 'Intra-State Supplies'];
+  const section5ColumnWidths = [200, 150, 150];
+  drawTableHeaders(page, section5Headers, section5ColumnWidths, xOffset, yOffset, helveticaBold);
+  yOffset -= lineHeight;
+
+  // Table data for section 5
+  const section5Data = [
+    ['(a) From composition taxable persons, exempt and nil rated', reportData.sections['5'].a.interState, reportData.sections['5'].a.intraState],
+    ['(b) Non-GST supply', reportData.sections['5'].b.interState, reportData.sections['5'].b.intraState]
+  ];
+
+  section5Data.forEach(row => {
+    drawTableRow(page, row, section5ColumnWidths, xOffset, yOffset, helveticaFont);
+    yOffset -= lineHeight;
+  });
+  yOffset -= lineHeight;
+
+  // Section 6.1 - Payment of tax
+  page.drawText('6.1 Payment of tax', {
+    x: xOffset,
+    y: yOffset,
+    size: 12,
+    font: helveticaBold
+  });
+  yOffset -= lineHeight * 1.5;
+
+  // Table headers for section 6.1
+  const section6Headers = ['Description', 'Tax', 'Interest', 'Late Fee', 'Penalty'];
+  const section6ColumnWidths = [200, 80, 80, 80, 80];
+  drawTableHeaders(page, section6Headers, section6ColumnWidths, xOffset, yOffset, helveticaBold);
+  yOffset -= lineHeight;
+
+  // Table data for section 6.1
+  const section6Data = [
+    ['IGST', reportData.sections['6.1'].igst.tax, reportData.sections['6.1'].igst.interest, reportData.sections['6.1'].igst.lateFee, reportData.sections['6.1'].igst.penalty],
+    ['CGST', reportData.sections['6.1'].cgst.tax, reportData.sections['6.1'].cgst.interest, reportData.sections['6.1'].cgst.lateFee, reportData.sections['6.1'].cgst.penalty],
+    ['SGST', reportData.sections['6.1'].sgst.tax, reportData.sections['6.1'].sgst.interest, reportData.sections['6.1'].sgst.lateFee, reportData.sections['6.1'].sgst.penalty],
+    ['CESS', reportData.sections['6.1'].cess.tax, reportData.sections['6.1'].cess.interest, reportData.sections['6.1'].cess.lateFee, reportData.sections['6.1'].cess.penalty]
+  ];
+
+  section6Data.forEach(row => {
+    drawTableRow(page, row, section6ColumnWidths, xOffset, yOffset, helveticaFont);
+    yOffset -= lineHeight;
+  });
+
+  // Finalize PDF
+  const tempDir = path.join(__dirname, '../temp');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir);
+  }
+
+  const fileName = `gstr3b-${uuidv4()}.pdf`;
+  const filePath = path.join(tempDir, fileName);
+
+  const pdfBytes = await pdfDoc.save();
+  fs.writeFileSync(filePath, pdfBytes);
+
+  return filePath;
+}
+
+function drawTableHeaders(page, headers, columnWidths, x, y, font) {
+  let xPos = x;
+
+  headers.forEach((header, index) => {
+    page.drawText(header, {
+      x: xPos,
+      y: y,
+      size: 10,
+      font: font
+    });
+
+    xPos += columnWidths[index];
+  });
+}
+
+function drawTableRow(page, rowData, columnWidths, x, y, font) {
+  let xPos = x;
+
+  rowData.forEach((cell, index) => {
+    const value = typeof cell === 'number' ? cell.toFixed(2) : String(cell);
+
+    page.drawText(value, {
+      x: xPos,
+      y: y,
+      size: 10,
+      font: font
+    });
+
+    xPos += columnWidths[index];
+  });
+}
 ```
 
-### 4. Backend Routes
+### Express App Setup
 
-**backend/routes/collectionRoutes.js**
 ```javascript
+// server/app.js
 const express = require('express');
-const router = express.Router();
-const collectionController = require('../controllers/collectionController');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const routes = require('./routes');
+require('dotenv').config();
 
-// Get all collections
-router.get('/collections', collectionController.getAllCollections);
+const app = express();
 
-// Get fields from a collection
-router.get('/fields', collectionController.getFields);
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(morgan('dev'));
 
-module.exports = router;
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX) || 100 // limit each IP to 100 requests per windowMs
+});
+app.use(limiter);
+
+// Routes
+app.use('/api', routes);
+
+// File download route
+app.get('/download', (req, res) => {
+  const { file } = req.query;
+  if (!file) {
+    return res.status(400).json({ error: 'File parameter is required' });
+  }
+
+  const filePath = path.join(__dirname, 'temp', file);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  res.download(filePath, file, () => {
+    fs.unlinkSync(filePath); // Delete file after download
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    error: 'Server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred'
+  });
+});
+
+module.exports = app;
 ```
 
-**backend/routes/queryRoutes.js**
 ```javascript
-const express = require('express');
-const router = express.Router();
-const queryController = require('../controllers/queryController');
+// server/server.js
+const app = require('./app');
+const { connectDB } = require('./config/database');
+require('dotenv').config();
 
-// Execute query with optional GST calculation
-router.post('/query', queryController.executeQueryWithGST);
+const PORT = process.env.PORT || 5000;
 
-// Export data in requested format
-router.post('/export', queryController.exportData);
+async function startServer() {
+  try {
+    // Connect to MongoDB
+    await connectDB();
 
-// Generate receipt for specific document
-router.post('/receipt/:collection/:documentId', queryController.generateReceipt);
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
 
-module.exports = router;
+startServer();
 ```
 
 ## Frontend Implementation
 
-### 1. Frontend Setup and Configuration
+### Environment Setup (.env)
 
-**frontend/package.json (key dependencies)**
-```json
-{
-  "name": "mongodb-data-explorer-frontend",
-  "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "@emotion/react": "^11.11.0",
-    "@emotion/styled": "^11.11.0",
-    "@mui/icons-material": "^5.11.16",
-    "@mui/material": "^5.13.0",
-    "@mui/x-data-grid": "^6.4.0",
-    "axios": "^1.4.0",
-    "file-saver": "^2.0.5",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-json-view": "^1.21.3",
-    "react-scripts": "5.0.1",
-    "react-toastify": "^9.1.3"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  }
-}
 ```
-
-**frontend/.env**
-```
+# client/.env
 REACT_APP_API_URL=http://localhost:5000/api
 ```
 
-### 2. Frontend Services and Contexts
+### App Component
 
-**frontend/src/services/api.js**
-```javascript
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-
-// Create axios instance with base URL
-const apiClient = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// API service functions
-export const collectionsApi = {
-  // Get all collections
-  getCollections: async () => {
-    try {
-      const response = await apiClient.get('/collections');
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to fetch collections');
-    }
-  },
-
-  // Get fields from a collection
-  getFields: async (collectionName) => {
-    try {
-      const response = await apiClient.get(`/fields?collection=${collectionName}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to fetch fields');
-    }
-  }
-};
-
-export const queryApi = {
-  // Execute a query with optional GST calculation
-  executeQuery: async (collection, fields, limit, gstConfig) => {
-    try {
-      const response = await apiClient.post('/query', {
-        collection,
-        fields,
-        limit,
-        gstConfig
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to execute query');
-    }
-  },
-
-  // Export data in specified format
-  exportData: async (data, format, filename) => {
-    try {
-      const response = await apiClient.post('/export', {
-        data,
-        format,
-        filename
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to export data');
-    }
-  },
-
-  // Generate receipt for a specific document
-  generateReceipt: async (collection, documentId, gstConfig) => {
-    try {
-      const response = await apiClient.post(`/receipt/${collection}/${documentId}`, {
-        gstConfig
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to generate receipt');
-    }
-  }
-};
-
-export default {
-  collectionsApi,
-  queryApi
-};
-```
-
-**frontend/src/services/storage.js**
-```javascript
-// Local storage service for persisting app state
-
-const STORAGE_KEYS = {
-  SELECTED_COLLECTION: 'selected_collection',
-  SELECTED_FIELDS: 'selected_fields',
-  LIMIT: 'limit',
-  GST_CONFIG: 'gst_config',
-  VIEW_TYPE: 'view_type'
-};
-
-export const saveToStorage = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`Error saving to localStorage: ${error}`);
-  }
-};
-
-export const getFromStorage = (key, defaultValue = null) => {
-  try {
-    const value = localStorage.getItem(key);
-    return value ? JSON.parse(value) : defaultValue;
-  } catch (error) {
-    console.error(`Error reading from localStorage: ${error}`);
-    return defaultValue;
-  }
-};
-
-export const clearStorageItem = (key) => {
-  try {
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.error(`Error clearing localStorage item: ${error}`);
-  }
-};
-
-export default {
-  STORAGE_KEYS,
-  saveToStorage,
-  getFromStorage,
-  clearStorageItem
-};
-```
-
-**frontend/src/contexts/AppContext.jsx**
 ```jsx
-import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { toast } from 'react-toastify';
-import { collectionsApi, queryApi } from '../services/api';
-import { STORAGE_KEYS, getFromStorage, saveToStorage } from '../services/storage';
-
-// Create context
-export const AppContext = createContext();
-
-export const AppProvider = ({ children }) => {
-  // State variables
-  const [collections, setCollections] = useState([]);
-  const [selectedCollection, setSelectedCollection] = useState(
-    getFromStorage(STORAGE_KEYS.SELECTED_COLLECTION, '')
-  );
-  const [fields, setFields] = useState([]);
-  const [selectedFields, setSelectedFields] = useState(
-    getFromStorage(STORAGE_KEYS.SELECTED_FIELDS, [])
-  );
-  const [limit, setLimit] = useState(
-    getFromStorage(STORAGE_KEYS.LIMIT, 5)
-  );
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [viewType, setViewType] = useState(
-    getFromStorage(STORAGE_KEYS.VIEW_TYPE, 'table')
-  );
-  const [gstConfig, setGstConfig] = useState(
-    getFromStorage(STORAGE_KEYS.GST_CONFIG, { enabled: false, field: '', percentage: 18 })
-  );
-
-  // Fetch collections when component mounts
-  useEffect(() => {
-    const fetchCollections = async () => {
-      try {
-        setLoading(true);
-        const response = await collectionsApi.getCollections();
-        setCollections(response.data);
-      } catch (error) {
-        toast.error(error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCollections();
-  }, []);
-
-  // Fetch fields when collection changes
-  useEffect(() => {
-    const fetchFields = async () => {
-      if (!selectedCollection) return;
-
-      try {
-        setLoading(true);
-        const response = await collectionsApi.getFields(selectedCollection);
-        setFields(response.data);
-
-        // Auto-select all fields if none selected yet
-        if (selectedFields.length === 0) {
-          setSelectedFields(response.data);
-          saveToStorage(STORAGE_KEYS.SELECTED_FIELDS, response.data);
-        }
-      } catch (error) {
-        toast.error(error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchFields();
-  }, [selectedCollection]);
-
-  // Save preferences to localStorage when they change
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.SELECTED_COLLECTION, selectedCollection);
-  }, [selectedCollection]);
-
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.SELECTED_FIELDS, selectedFields);
-  }, [selectedFields]);
-
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.LIMIT, limit);
-  }, [limit]);
-
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.VIEW_TYPE, viewType);
-  }, [viewType]);
-
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.GST_CONFIG, gstConfig);
-  }, [gstConfig]);
-
-  // Handler function for collection change
-  const handleCollectionChange = useCallback((collectionName) => {
-    setSelectedCollection(collectionName);
-    setSelectedFields([]);
-    setResults([]);
-  }, []);
-
-  // Handler function for field selection
-  const handleFieldsChange = useCallback((newFields) => {
-    setSelectedFields(newFields);
-  }, []);
-
-  // Handler function for limit change
-  const handleLimitChange = useCallback((newLimit) => {
-    setLimit(parseInt(newLimit) || 5);
-  }, []);
-
-  // Handler function for GST configuration
-  const handleGstConfigChange = useCallback((config) => {
-    setGstConfig(config);
-  }, []);
-
-  // Handler function to execute query
-  const executeQuery = useCallback(async () => {
-    if (!selectedCollection) {
-      toast.warning('Please select a collection first');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await queryApi.executeQuery(
-        selectedCollection,
-        selectedFields,
-        limit,
-        gstConfig
-      );
-      setResults(response.data);
-      toast.success(`Retrieved ${response.data.length} records`);
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedCollection, selectedFields, limit, gstConfig]);
-
-  // Handler function for exporting data
-  const exportData = useCallback(async (format) => {
-    if (!results || results.length === 0) {
-      toast.warning('No data to export');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await queryApi.exportData(
-        results,
-        format,
-        selectedCollection
-      );
-
-      // Create and download the file
-      const dataUrl = `data:${response.mimeType};base64,${response.data}`;
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = response.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success(`Exported data as ${format.toUpperCase()}`);
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [results, selectedCollection]);
-
-  // Handler function for generating receipt
-  const generateReceipt = useCallback(async (documentId) => {
-    try {
-      setLoading(true);
-      const response = await queryApi.generateReceipt(
-        selectedCollection,
-        documentId,
-        gstConfig
-      );
-
-      // Create and download the receipt
-      const dataUrl = `data:${response.mimeType};base64,${response.data}`;
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = response.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success('Receipt generated');
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedCollection, gstConfig]);
-
-  return (
-    <AppContext.Provider
-      value={{
-        collections,
-        selectedCollection,
-        fields,
-        selectedFields,
-        limit,
-        results,
-        loading,
-        viewType,
-        gstConfig,
-        handleCollectionChange,
-        handleFieldsChange,
-        handleLimitChange,
-        handleGstConfigChange,
-        executeQuery,
-        exportData,
-        generateReceipt,
-        setViewType
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
-};
-
-export default AppProvider;
-```
-
-### 3. Frontend UI Components
-
-**frontend/src/theme.js**
-```javascript
-import { createTheme } from '@mui/material/styles';
+// client/src/App.js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import { DataProvider } from './context/DataContext';
+import Layout from './components/Layout';
+import Dashboard from './pages/Dashboard';
+import NotFound from './pages/NotFound';
 
 const theme = createTheme({
   palette: {
     primary: {
       main: '#1976d2',
-      light: '#63a4ff',
-      dark: '#004ba0',
-      contrastText: '#ffffff',
     },
     secondary: {
-      main: '#f50057',
-      light: '#ff5983',
-      dark: '#bb002f',
-      contrastText: '#ffffff',
-    },
-    background: {
-      default: '#f5f5f5',
-      paper: '#ffffff',
+      main: '#dc004e',
     },
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontSize: '2.5rem',
-      fontWeight: 500,
-    },
-    h2: {
-      fontSize: '2rem',
-      fontWeight: 500,
-    },
-    h3: {
-      fontSize: '1.75rem',
-      fontWeight: 500,
-    },
-    h4: {
-      fontSize: '1.5rem',
-      fontWeight: 500,
-    },
-    h5: {
-      fontSize: '1.25rem',
-      fontWeight: 500,
-    },
-    h6: {
-      fontSize: '1rem',
-      fontWeight: 500,
-    },
-  },
-  components: {
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.1)',
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.1)',
-          borderRadius: '8px',
-        },
-      },
-    },
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          borderRadius: '8px',
-        },
-      },
-    },
-    MuiTextField: {
-      styleOverrides: {
-        root: {
-          marginBottom: '16px',
-        },
-      },
-    },
   },
 });
 
-export default theme;
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <DataProvider>
+        <Router>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Layout>
+        </Router>
+      </DataProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;
 ```
 
-**frontend/src/components/common/Header.jsx**
-```jsx
-import React from 'react';
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Box,
-  useTheme,
-  useMediaQuery,
-  IconButton,
-} from '@mui/material';
-import DatabaseIcon from '@mui/icons-material/Storage';
-import GitHubIcon from '@mui/icons-material/GitHub';
-import HelpIcon from '@mui/icons-material/Help';
+### Context for State Management
 
-const Header = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+```jsx
+// client/src/context/DataContext.js
+import React, { createContext, useState, useEffect } from 'react';
+import { fetchCollections } from '../services/apiService';
+
+export const DataContext = createContext();
+
+export const DataProvider = ({ children }) => {
+  const [collections, setCollections] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedCollection, setSelectedCollection] = useState('');
+  const [fields, setFields] = useState([]);
+  const [selectedFields, setSelectedFields] = useState([]);
+  const [limit, setLimit] = useState(100);
+  const [queryResults, setQueryResults] = useState([]);
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'json'
+
+  // Load collections on initial render
+  useEffect(() => {
+    const loadCollections = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchCollections();
+        setCollections(data.collections);
+        setError(null);
+      } catch (err) {
+        setError('Failed to load collections: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCollections();
+  }, []);
+
+  // Additional state for GSTR-3B report
+  const [companyId, setCompanyId] = useState('');
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
+  const [reportData, setReportData] = useState(null);
 
   return (
-    <AppBar position="fixed" color="primary" sx={{ zIndex: theme.zIndex.drawer + 1 }}>
-      <Toolbar>
-        <DatabaseIcon sx={{ mr: 2 }} />
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          {isMobile ? 'MongoDB Explorer' : 'MongoDB Data Exploration Tool with GST Integration'}
-        </Typography>
+    <DataContext.Provider value={{
+      collections,
+      loading,
+      error,
+      selectedCollection,
+      setSelectedCollection,
+      fields,
+      setFields,
+      selectedFields,
+      setSelectedFields,
+      limit,
+      setLimit,
+      queryResults,
+      setQueryResults,
+      viewMode,
+      setViewMode,
+      companyId,
+      setCompanyId,
+      reportYear,
+      setReportYear,
+      reportMonth,
+      setReportMonth,
+      reportData,
+      setReportData
+    }}>
+      {children}
+    </DataContext.Provider>
+  );
+};
+```
 
-        <Box sx={{ display: 'flex' }}>
-          <IconButton
-            color="inherit"
-            aria-label="help"
-            title="Help"
-            onClick={() => alert('MongoDB Data Explorer with GST integration.\nSelect a collection, configure fields and GST options, and explore your data!')}
-          >
-            <HelpIcon />
-          </IconButton>
+### API Service
 
-          <IconButton
-            color="inherit"
-            aria-label="github"
-            title="GitHub Repository"
-            component="a"
-            href="https://github.com/yourusername/mongodb-data-explorer"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <GitHubIcon />
-          </IconButton>
-        </Box>
-      </Toolbar>
-    </AppBar>
+```jsx
+// client/src/services/apiService.js
+const API_URL = process.env.REACT_APP_API_URL;
+
+// Fetch all collections
+export const fetchCollections = async () => {
+  const response = await fetch(`${API_URL}/collections`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch collections');
+  }
+  return await response.json();
+};
+
+// Fetch fields for a collection
+export const fetchFields = async (collectionName) => {
+  const response = await fetch(`${API_URL}/fields?collection=${collectionName}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch fields');
+  }
+  return await response.json();
+};
+
+// Execute a query
+export const executeQuery = async (queryData) => {
+  const response = await fetch(`${API_URL}/query`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(queryData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to execute query');
+  }
+  return await response.json();
+};
+
+// Export data
+export const exportData = async (data, format) => {
+  const response = await fetch(`${API_URL}/export`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ data, format }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to export data');
+  }
+
+  // Create a blob and download it
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+
+  // Set the file name based on format
+  let fileName;
+  switch (format) {
+    case 'excel':
+      fileName = 'export.xlsx';
+      break;
+    case 'csv':
+      fileName = 'export.csv';
+      break;
+    case 'json':
+      fileName = 'export.json';
+      break;
+    case 'pdf':
+      fileName = 'export.pdf';
+      break;
+    default:
+      fileName = 'export';
+  }
+
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+
+  // Clean up
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+};
+
+// Generate GSTR-3B report
+export const generateGSTR3BReport = async (reportData) => {
+  const response = await fetch(`${API_URL}/report/gstr3b`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(reportData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to generate GSTR-3B report');
+  }
+  return await response.json();
+};
+
+// Download GSTR-3B report PDF
+export const downloadReportPDF = (url) => {
+  window.open(`${API_URL.replace('/api', '')}${url}`, '_blank');
+};
+```
+
+### Layout Component
+
+```jsx
+// client/src/components/Layout.js
+import React from 'react';
+import { Box, Container, AppBar, Toolbar, Typography, Paper } from '@mui/material';
+import Sidebar from './Sidebar';
+
+const Layout = ({ children }) => {
+  return (
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <AppBar position="fixed">
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            MongoDB Data Explorer with GST Reports
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      <Sidebar />
+
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { sm: `calc(100% - 280px)` },
+          ml: { sm: '280px' },
+          mt: '64px'
+        }}
+      >
+        <Container maxWidth="xl">
+          <Paper sx={{ p: 2, mt: 2 }}>
+            {children}
+          </Paper>
+        </Container>
+      </Box>
+    </Box>
   );
 };
 
-export default Header;
+export default Layout;
 ```
 
-**frontend/src/components/common/Sidebar.jsx**
+### Sidebar Component
+
 ```jsx
-import React, { useContext } from 'react';
+// client/src/components/Sidebar.js
+import React, { useContext, useEffect } from 'react';
 import {
   Box,
   Drawer,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Divider,
-  useTheme,
-  useMediaQuery,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+  Autocomplete,
+  Chip,
   Typography,
-  Toolbar,
+  Divider,
+  Button,
+  CircularProgress
 } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import CollectionSelector from '../collection/CollectionSelector';
-import FieldSelector from '../collection/FieldSelector';
-import GstConfig from '../gst/GstConfig';
-import { AppContext } from '../../contexts/AppContext';
+import { DataContext } from '../context/DataContext';
+import { fetchFields, executeQuery } from '../services/apiService';
 
 const drawerWidth = 280;
 
 const Sidebar = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const { loading } = useContext(AppContext);
+  const {
+    collections,
+    loading,
+    selectedCollection,
+    setSelectedCollection,
+    fields,
+    setFields,
+    selectedFields,
+    setSelectedFields,
+    limit,
+    setLimit,
+    setQueryResults,
+    companyId,
+    setCompanyId,
+    reportYear,
+    setReportYear,
+    reportMonth,
+    setReportMonth,
+    setReportData
+  } = useContext(DataContext);
 
-  const drawer = (
-    <>
-      <Toolbar />
-      <Box sx={{ overflow: 'auto', p: 2 }}>
-        <List>
-          <ListItem>
-            <ListItemIcon>
-              <DashboardIcon />
-            </ListItemIcon>
-            <ListItemText primary="Dashboard" />
-          </ListItem>
-        </List>
-        <Divider />
+  // Load fields when collection is selected
+  useEffect(() => {
+    if (selectedCollection) {
+      const loadFields = async () => {
+        try {
+          const data = await fetchFields(selectedCollection);
+          setFields(data.fields);
+        } catch (error) {
+          console.error('Error loading fields:', error);
+        }
+      };
 
-        <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-          Data Selection
+      loadFields();
+    } else {
+      setFields([]);
+    }
+  }, [selectedCollection, setFields]);
+
+  const handleCollectionChange = (event) => {
+    setSelectedCollection(event.target.value);
+    setSelectedFields([]);
+  };
+
+  const handleLimitChange = (event) => {
+    setLimit(parseInt(event.target.value, 10));
+  };
+
+  const handleQuerySubmit = async () => {
+    if (!selectedCollection) return;
+
+    try {
+      const queryData = {
+        collectionName: selectedCollection,
+        limit,
+        fields: selectedFields
+      };
+
+      const results = await executeQuery(queryData);
+      setQueryResults(results.data);
+    } catch (error) {
+      console.error('Error executing query:', error);
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    try {
+      const reportData = await generateGSTR3BReport({
+        companyId,
+        year: reportYear,
+        month: reportMonth
+      });
+
+      setReportData(reportData);
+    } catch (error) {
+      console.error('Error generating report:', error);
+    }
+  };
+
+  return (
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: drawerWidth,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: drawerWidth,
+          boxSizing: 'border-box',
+          mt: '64px'
+        },
+      }}
+    >
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Data Explorer
         </Typography>
 
-        <CollectionSelector />
-        <FieldSelector />
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel id="collection-label">Collection</InputLabel>
+          <Select
+            labelId="collection-label"
+            id="collection-select"
+            value={selectedCollection}
+            label="Collection"
+            onChange={handleCollectionChange}
+            disabled={loading}
+          >
+            {collections.map((collection) => (
+              <MenuItem key={collection} value={collection}>
+                {collection}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <TextField
+          label="Limit"
+          type="number"
+          value={limit}
+          onChange={handleLimitChange}
+          fullWidth
+          sx={{ mb: 2 }}
+          InputProps={{ inputProps: { min: 1, max: 1000 } }}
+        />
+
+        <Autocomplete
+          multiple
+          id="fields-select"
+          options={fields.map(field => field.name)}
+          value={selectedFields}
+          onChange={(event, newValue) => {
+            setSelectedFields(newValue);
+          }}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => (
+              <Chip
+                label={option}
+                {...getTagProps({ index })}
+                key={option}
+              />
+            ))
+          }
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Select Fields"
+              placeholder="Fields"
+            />
+          )}
+          sx={{ mb: 2 }}
+          disabled={fields.length === 0}
+        />
+
+        <Button
+          variant="contained"
+          color="primary"
+          fullWidth
+          onClick={handleQuerySubmit}
+          disabled={!selectedCollection}
+          sx={{ mb: 3 }}
+        >
+          {loading ? <CircularProgress size={24} /> : 'Execute Query'}
+        </Button>
 
         <Divider sx={{ my: 2 }} />
 
-        <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-          GST Configuration
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          GSTR-3B Report
         </Typography>
 
-        <GstConfig />
-      </Box>
-    </>
-  );
+        <TextField
+          label="Company ID"
+          value={companyId}
+          onChange={(e) => setCompanyId(e.target.value)}
+          fullWidth
+          sx={{ mb: 2 }}
+        />
 
-  return (
-    <Box
-      component="nav"
-      sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-      aria-label="sidebar navigation"
-    >
-      {/* Mobile drawer */}
-      {isMobile ? (
-        <Drawer
-          variant="temporary"
-          open={false} // Control this with state if needed
-          sx={{
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: drawerWidth,
-              backgroundColor: theme.palette.background.paper
-            },
-          }}
-          ModalProps={{ keepMounted: true }}
+        <TextField
+          label="Year"
+          type="number"
+          value={reportYear}
+          onChange={(e) => setReportYear(parseInt(e.target.value, 10))}
+          fullWidth
+          sx={{ mb: 2 }}
+        />
+
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel id="month-label">Month</InputLabel>
+          <Select
+            labelId="month-label"
+            id="month-select"
+            value={reportMonth}
+            label="Month"
+            onChange={(e) => setReportMonth(parseInt(e.target.value, 10))}
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+              <MenuItem key={month} value={month}>
+                {month}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <Button
+          variant="contained"
+          color="secondary"
+          fullWidth
+          onClick={handleGenerateReport}
+          disabled={!companyId}
         >
-          {drawer}
-        </Drawer>
-      ) : (
-        // Desktop permanent drawer
-        <Drawer
-          variant="permanent"
-          sx={{
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: drawerWidth,
-              backgroundColor: theme.palette.background.paper,
-              borderRight: `1px solid ${theme.palette.divider}`
-            },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
-      )}
-    </Box>
+          Generate GSTR-3B Report
+        </Button>
+      </Box>
+    </Drawer>
   );
 };
 
 export default Sidebar;
 ```
 
-**frontend/src/components/collection/CollectionSelector.jsx**
+### Dashboard Component
+
 ```jsx
-import React, { useContext } from 'react';
-import {
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
-  Box,
-  Button,
-  CircularProgress,
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import { AppContext } from '../../contexts/AppContext';
-
-const CollectionSelector = () => {
-  const {
-    collections,
-    selectedCollection,
-    handleCollectionChange,
-    limit,
-    handleLimitChange,
-    executeQuery,
-    loading,
-  } = useContext(AppContext);
-
-  const handleExecuteQuery = () => {
-    executeQuery();
-  };
-
-  return (
-    <Box sx={{ mb: 2 }}>
-      <FormControl fullWidth sx={{ mb: 2 }}>
-        <InputLabel id="collection-select-label">Collection</InputLabel>
-        <Select
-          labelId="collection-select-label"
-          id="collection-select"
-          value={selectedCollection}
-          label="Collection"
-          onChange={(e) => handleCollectionChange(e.target.value)}
-          disabled={loading || collections.length === 0}
-        >
-          {collections.length === 0 ? (
-            <MenuItem value="" disabled>
-              No collections available
-            </MenuItem>
-          ) : (
-            collections.map((collection) => (
-              <MenuItem key={collection} value={collection}>
-                {collection}
-              </MenuItem>
-            ))
-          )}
-        </Select>
-      </FormControl>
-
-      <TextField
-        label="Limit Results"
-        type="number"
-        fullWidth
-        value={limit}
-        onChange={(e) => handleLimitChange(e.target.value)}
-        inputProps={{ min: 1, max: 100 }}
-        disabled={loading}
-        sx={{ mb: 2 }}
-      />
-
-      <Button
-        variant="contained"
-        color="primary"
-        fullWidth
-        onClick={handleExecuteQuery}
-        disabled={!selectedCollection || loading}
-        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
-      >
-        {loading ? 'Loading...' : 'Query Data'}
-      </Button>
-    </Box>
-  );
-};
-
-export default CollectionSelector;
-```
-
-**frontend/src/components/collection/FieldSelector.jsx**
-```jsx
-import React, { useContext } from 'react';
-import {
-  Box,
-  FormControl,
-  InputLabel,
-  Checkbox,
-  ListItemText,
-  MenuItem,
-  Select,
-  Chip,
-  OutlinedInput,
-} from '@mui/material';
-import { AppContext } from '../../contexts/AppContext';
-
-const ITEM_HEIGHT = 48;
-const ITEM_PADDING_TOP = 8;
-const MenuProps = {
-  PaperProps: {
-    style: {
-      maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
-      width: 250,
-    },
-  },
-};
-
-const FieldSelector = () => {
-  const {
-    fields,
-    selectedFields,
-    handleFieldsChange,
-    loading,
-    selectedCollection,
-  } = useContext(AppContext);
-
-  const handleChange = (event) => {
-    const {
-      target: { value },
-    } = event;
-    handleFieldsChange(typeof value === 'string' ? value.split(',') : value);
-  };
-
-  return (
-    <Box sx={{ mb: 2 }}>
-      <FormControl fullWidth disabled={loading || !selectedCollection || fields.length === 0}>
-        <InputLabel id="field-select-label">Select Fields</InputLabel>
-        <Select
-          labelId="field-select-label"
-          id="field-select"
-          multiple
-          value={selectedFields}
-          onChange={handleChange}
-          input={<OutlinedInput id="select-multiple-fields" label="Select Fields" />}
-          renderValue={(selected) => (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {selected.map((value) => (
-                <Chip key={value} label={value} size="small" />
-              ))}
-            </Box>
-          )}
-          MenuProps={MenuProps}
-        >
-          {fields.map((field) => (
-            <MenuItem key={field} value={field}>
-              <Checkbox checked={selectedFields.indexOf(field) > -1} />
-              <ListItemText primary={field} />
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    </Box>
-  );
-};
-
-export default FieldSelector;
-```
-
-**frontend/src/components/gst/GstConfig.jsx**
-```jsx
-import React, { useContext, useState, useEffect } from 'react';
-import {
-  Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormControlLabel,
-  Switch,
-  Typography,
-  Button,
-} from '@mui/material';
-import CalculateIcon from '@mui/icons-material/Calculate';
-import { AppContext } from '../../contexts/AppContext';
-
-const GST_PERCENTAGES = [5, 12, 18, 28];
-
-const GstConfig = () => {
-  const {
-    fields,
-    gstConfig,
-    handleGstConfigChange,
-    loading,
-    selectedCollection,
-    results,
-    executeQuery,
-  } = useContext(AppContext);
-
-  // Filter fields that might be suitable for GST calculation (numeric fields)
-  const [numericFields, setNumericFields] = useState([]);
-
-  useEffect(() => {
-    if (results && results.length > 0) {
-      // Try to determine which fields contain numeric values
-      const potentialNumericFields = fields.filter(fieldName => {
-        const firstResult = results[0];
-        const value = firstResult[fieldName];
-        // Check if the value is a number or can be parsed as one
-        return (
-          typeof value === 'number' ||
-          (typeof value === 'string' && !isNaN(parseFloat(value)))
-        );
-      });
-      setNumericFields(potentialNumericFields);
-    } else {
-      setNumericFields(fields);
-    }
-  }, [fields, results]);
-
-  const handleGstEnabledChange = (event) => {
-    handleGstConfigChange({
-      ...gstConfig,
-      enabled: event.target.checked
-    });
-  };
-
-  const handleGstFieldChange = (event) => {
-    handleGstConfigChange({
-      ...gstConfig,
-      field: event.target.value
-    });
-  };
-
-  const handleGstPercentageChange = (event) => {
-    handleGstConfigChange({
-      ...gstConfig,
-      percentage: event.target.value
-    });
-  };
-
-  const applyGstCalculation = () => {
-    if (gstConfig.enabled && gstConfig.field) {
-      executeQuery();
-    }
-  };
-
-  return (
-    <Box sx={{ mb: 2 }}>
-      <FormControlLabel
-        control={
-          <Switch
-            checked={gstConfig.enabled}
-            onChange={handleGstEnabledChange}
-            disabled={loading || !selectedCollection || fields.length === 0}
-          />
-        }
-        label="Enable GST Calculation"
-      />
-
-      {gstConfig.enabled && (
-        <>
-          <Box sx={{ mt: 2 }}>
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel id="gst-field-label">GST Field</InputLabel>
-              <Select
-                labelId="gst-field-label"
-                id="gst-field-select"
-                value={gstConfig.field}
-                label="GST Field"
-                onChange={handleGstFieldChange}
-                disabled={loading || numericFields.length === 0}
-              >
-                {numericFields.map((field) => (
-                  <MenuItem key={field} value={field}>
-                    {field}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel id="gst-percentage-label">GST Percentage</InputLabel>
-              <Select
-                labelId="gst-percentage-label"
-                id="gst-percentage-select"
-                value={gstConfig.percentage}
-                label="GST Percentage"
-                onChange={handleGstPercentageChange}
-                disabled={loading}
-              >
-                {GST_PERCENTAGES.map((percentage) => (
-                  <MenuItem key={percentage} value={percentage}>
-                    {percentage}%
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              GST Amount will be calculated as: {gstConfig.field} × {gstConfig.percentage}%
-            </Typography>
-
-            <Button
-              variant="outlined"
-              color="primary"
-              fullWidth
-              onClick={applyGstCalculation}
-              disabled={loading || !gstConfig.field || !selectedCollection}
-              startIcon={<CalculateIcon />}
-            >
-              Apply GST Calculation
-            </Button>
-          </Box>
-        </>
-      )}
-    </Box>
-  );
-};
-
-export default GstConfig;
-```
-
-**frontend/src/components/results/ResultsTable.jsx**
-```jsx
-import React, { useContext, useMemo } from 'react';
-import {
-  DataGrid,
-  GridToolbar,
-  gridClasses
-} from '@mui/x-data-grid';
+// client/src/pages/Dashboard.js
+import React, { useContext, useState } from 'react';
 import {
   Box,
   Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  ToggleButton,
+  ToggleButtonGroup,
+  Button,
+  Menu,
+  MenuItem,
   IconButton,
-  Tooltip,
-  alpha,
-  useTheme
+  Tabs,
+  Tab,
+  Divider
 } from '@mui/material';
-import ReceiptIcon from '@mui/icons-material/Receipt';
-import { AppContext } from '../../contexts/AppContext';
+import {
+  Download as DownloadIcon,
+  Print as PrintIcon,
+  Article as ArticleIcon
+} from '@mui/icons-material';
+import { DataContext } from '../context/DataContext';
+import { exportData, downloadReportPDF } from '../services/apiService';
+import JSONView from '../components/JSONView';
+import ReportSummary from '../components/ReportSummary';
+import ReceiptView from '../components/ReceiptView';
 
-const ResultsTable = () => {
-  const { results, loading, generateReceipt } = useContext(AppContext);
-  const theme = useTheme();
+const Dashboard = () => {
+  const {
+    queryResults,
+    viewMode,
+    setViewMode,
+    reportData
+  } = useContext(DataContext);
 
-  // Create columns based on the first result object
-  const columns = useMemo(() => {
-    if (!results || results.length === 0) return [];
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [exportAnchorEl, setExportAnchorEl] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [tabValue, setTabValue] = useState(0);
 
-    const firstResult = results[0];
-    return Object.keys(firstResult).map((key) => ({
-      field: key,
-      headerName: key,
-      flex: 1,
-      minWidth: 150,
-      renderCell: (params) => {
-        // Handle different data types for display
-        const value = params.value;
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
 
-        if (value === null || value === undefined) {
-          return '';
-        } else if (typeof value === 'object') {
-          // Handle MongoDB ObjectId or Date objects
-          if (value.$oid) {
-            return value.$oid;
-          } else if (value.$date) {
-            return new Date(value.$date).toLocaleString();
-          } else if (value.$numberInt) {
-            return parseInt(value.$numberInt);
-          } else if (value.$numberDouble) {
-            return parseFloat(value.$numberDouble).toFixed(2);
-          } else {
-            return JSON.stringify(value);
-          }
-        } else if (key === 'GST Amount' || key === 'Total Amount') {
-          // Format GST and Total amounts
-          return typeof value === 'number' ?
-            `₹${value.toFixed(2)}` : value;
-        }
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
-        return value;
-      }
-    }));
-  }, [results]);
+  const handleViewModeChange = (event, newMode) => {
+    if (newMode !== null) {
+      setViewMode(newMode);
+    }
+  };
 
-  // Add action column for receipt generation
-  const columnsWithActions = useMemo(() => {
-    if (columns.length === 0) return [];
+  const handleExportClick = (event) => {
+    setExportAnchorEl(event.currentTarget);
+  };
 
-    return [
-      ...columns,
-      {
-        field: 'actions',
-        headerName: 'Actions',
-        width: 100,
-        sortable: false,
-        filterable: false,
-        renderCell: (params) => (
-          <Tooltip title="Generate Receipt">
-            <IconButton
-              onClick={() => generateReceipt(params.row._id.$oid || params.row._id)}
-              size="small"
-              color="primary"
-            >
-              <ReceiptIcon />
-            </IconButton>
-          </Tooltip>
-        ),
-      },
-    ];
-  }, [columns, generateReceipt]);
+  const handleExportClose = () => {
+    setExportAnchorEl(null);
+  };
 
-  // Create rows with unique ids
-  const rows = useMemo(() => {
-    return results.map((result, index) => ({
-      ...result,
-      id: result._id?.$oid || result._id || index,
-    }));
-  }, [results]);
+  const handleExport = async (format) => {
+    await exportData(queryResults, format);
+    handleExportClose();
+  };
 
-  if (!results || results.length === 0) {
+  const handleRowClick = (row) => {
+    setSelectedRow(row);
+  };
+
+  const handleCloseReceiptView = () => {
+    setSelectedRow(null);
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  const handleDownloadReport = () => {
+    if (reportData && reportData.pdfUrl) {
+      downloadReportPDF(reportData.pdfUrl);
+    }
+  };
+
+  if (queryResults.length === 0 && !reportData) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '300px',
-          width: '100%',
-          backgroundColor: alpha(theme.palette.primary.main, 0.05),
-          borderRadius: 1,
-        }}
-      >
-        <Typography variant="body1" color="textSecondary">
-          No results to display. Select a collection and execute a query.
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h5" component="h1" gutterBottom>
+          MongoDB Data Explorer
+        </Typography>
+        <Typography variant="body1">
+          Use the sidebar to select a collection and fields, then execute a query to see results.
+        </Typography>
+        <Typography variant="body1" sx={{ mt: 2 }}>
+          For GSTR-3B reports, provide company ID, year, and month, then click "Generate GSTR-3B Report".
         </Typography>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ height: 500, width: '100%' }}>
-      <DataGrid
-        rows={rows}
-        columns={columnsWithActions}
-        loading={loading}
-        disableSelectionOnClick
-        getRowHeight={() => 'auto'}
-        sx={{
-          [`& .${gridClasses.cell}`]: {
-            py: 1,
-          },
-          border: 1,
-          borderColor: 'divider',
-          '& .MuiDataGrid-cell:focus': {
-            outline: 'none',
-          }
-        }}
-        initialState={{
-          pagination: {
-            paginationModel: {
-              pageSize: 10,
-            },
-          },
-        }}
-        pageSizeOptions={[5, 10, 25, 50, 100]}
-        components={{
-          Toolbar: GridToolbar
-        }}
-        componentsProps={{
-          toolbar: {
-            showQuickFilter: true,
-            quickFilterProps: { debounceMs: 500 },
-            printOptions: { disableToolbarButton: true }
-          }
-        }}
-      />
+    <Box sx={{ p: 2 }}>
+      <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
+        <Tab label="Data Explorer" />
+        {reportData && <Tab label="GSTR-3B Report" />}
+      </Tabs>
+
+      {tabValue === 0 && (
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h5" component="h1">
+              Query Results
+            </Typography>
+
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={handleViewModeChange}
+                aria-label="view mode"
+                size="small"
+              >
+                <ToggleButton value="table" aria-label="table view">
+                  Table
+                </ToggleButton>
+                <ToggleButton value="json" aria-label="json view">
+                  JSON
+                </ToggleButton>
+              </ToggleButtonGroup>
+
+              <Button
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportClick}
+                disabled={queryResults.length === 0}
+              >
+                Export
+              </Button>
+
+              <Menu
+                anchorEl={exportAnchorEl}
+                open={Boolean(exportAnchorEl)}
+                onClose={handleExportClose}
+              >
+                <MenuItem onClick={() => handleExport('excel')}>Excel</MenuItem>
+                <MenuItem onClick={() => handleExport('csv')}>CSV</MenuItem>
+                <MenuItem onClick={() => handleExport('json')}>JSON</MenuItem>
+                <MenuItem onClick={() => handleExport('pdf')}>PDF</MenuItem>
+              </Menu>
+            </Box>
+          </Box>
+
+          {queryResults.length > 0 ? (
+            viewMode === 'table' ? (
+              <>
+                <TableContainer component={Paper} sx={{ mb: 2 }}>
+                  <Table sx={{ minWidth: 650 }} aria-label="results table">
+                    <TableHead>
+                      <TableRow>
+                        {Object.keys(queryResults[0]).map((header) => (
+                          <TableCell key={header}>{header}</TableCell>
+                        ))}
+                        <TableCell align="right">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {queryResults
+                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                        .map((row, index) => (
+                          <TableRow
+                            key={index}
+                            sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                          >
+                            {Object.entries(row).map(([key, value]) => (
+                              <TableCell key={key}>
+                                {typeof value === 'object'
+                                  ? JSON.stringify(value).substring(0, 50) + (JSON.stringify(value).length > 50 ? '...' : '')
+                                  : String(value).substring(0, 50) + (String(value).length > 50 ? '...' : '')
+                                }
+                              </TableCell>
+                            ))}
+                            <TableCell align="right">
+                              <IconButton
+                                aria-label="view receipt"
+                                onClick={() => handleRowClick(row)}
+                                size="small"
+                              >
+                                <ArticleIcon />
+                              </IconButton>
+                              <IconButton
+                                aria-label="print"
+                                onClick={() => handleRowClick(row)}
+                                size="small"
+                              >
+                                <PrintIcon />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                <TablePagination
+                  rowsPerPageOptions={[10, 25, 50]}
+                  component="div"
+                  count={queryResults.length}
+                  rowsPerPage={rowsPerPage}
+                  page={page}
+                  onPageChange={handleChangePage}
+                  onRowsPerPageChange={handleChangeRowsPerPage}
+                />
+              </>
+            ) : (
+              <JSONView data={queryResults} />
+            )
+          ) : (
+            <Typography variant="body1">No results to display.</Typography>
+          )}
+
+          {selectedRow && (
+            <ReceiptView
+              data={selectedRow}
+              open={Boolean(selectedRow)}
+              onClose={handleCloseReceiptView}
+            />
+          )}
+        </>
+      )}
+
+      {tabValue === 1 && reportData && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h5" component="h1">
+              GSTR-3B Report
+            </Typography>
+
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              onClick={handleDownloadReport}
+              color="primary"
+            >
+              Download PDF
+            </Button>
+          </Box>
+
+          <Divider sx={{ mb: 2 }} />
+
+          <ReportSummary data={reportData.reportData} />
+        </Box>
+      )}
     </Box>
   );
 };
 
-export default ResultsTable;
+export default Dashboard;
 ```
 
-**frontend/src/components/results/JsonViewer.jsx**
+### Additional Components
+
 ```jsx
-import React, { useContext } from 'react';
-import { Box, Typography, Paper } from '@mui/material';
-import ReactJson from 'react-json-view';
-import { AppContext } from '../../contexts/AppContext';
+// client/src/components/JSONView.js
+import React from 'react';
+import { Box } from '@mui/material';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
-const JsonViewer = () => {
-  const { results, loading } = useContext(AppContext);
-
-  if (loading) {
-    return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography>Loading data...</Typography>
-      </Box>
-    );
-  }
-
-  if (!results || results.length === 0) {
-    return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography>No results to display</Typography>
-      </Box>
-    );
-  }
-
+const JSONView = ({ data }) => {
   return (
-    <Paper sx={{ p: 2, overflow: 'auto', maxHeight: '70vh' }}>
-      <ReactJson
-        src={results}
-        theme="rjv-default"
-        name={false}
-        collapsed={1}
-        displayDataTypes={false}
-        enableClipboard={true}
-        style={{
-          fontFamily: 'Monaco, monospace',
-          fontSize: '14px',
-          lineHeight: '1.5'
-        }}
-      />
-    </Paper>
-  );
-};
-
-export default JsonViewer;
-```
-
-**frontend/src/components/results/ViewToggle.jsx**
-```jsx
-import React, { useContext } from 'react';
-import {
-  Box,
-  ToggleButtonGroup,
-  ToggleButton,
-  Tooltip
-} from '@mui/material';
-import TableViewIcon from '@mui/icons-material/TableView';
-import CodeIcon from '@mui/icons-material/Code';
-import { AppContext } from '../../contexts/AppContext';
-
-const ViewToggle = () => {
-  const { viewType, setViewType } = useContext(AppContext);
-
-  const handleViewChange = (event, newView) => {
-    if (newView !== null) {
-      setViewType(newView);
-    }
-  };
-
-  return (
-    <Box sx={{ mb: 2 }}>
-      <ToggleButtonGroup
-        value={viewType}
-        exclusive
-        onChange={handleViewChange}
-        aria-label="view type"
-        size="small"
-      >
-        <ToggleButton value="table" aria-label="table view">
-          <Tooltip title="Table View">
-            <TableViewIcon />
-          </Tooltip>
-        </ToggleButton>
-        <ToggleButton value="json" aria-label="json view">
-          <Tooltip title="JSON View">
-            <CodeIcon />
-          </Tooltip>
-        </ToggleButton>
-      </ToggleButtonGroup>
+    <Box sx={{ fontSize: '14px', lineHeight: 1.5, fontFamily: 'monospace' }}>
+      <SyntaxHighlighter language="json" style={docco} showLineNumbers={true}>
+        {JSON.stringify(data, null, 2)}
+      </SyntaxHighlighter>
     </Box>
   );
 };
 
-export default ViewToggle;
+export default JSONView;
 ```
 
-**frontend/src/components/export/ExportOptions.jsx**
 ```jsx
-import React, { useContext, useState } from 'react';
+// client/src/components/ReceiptView.js
+import React from 'react';
 import {
-  Box,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Button,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  CircularProgress,
+  Typography,
+  Divider,
+  Grid,
+  Paper
 } from '@mui/material';
-import DownloadIcon from '@mui/icons-material/Download';
-import FileExcelIcon from '@mui/icons-material/TableView';
-import FileCsvIcon from '@mui/icons-material/GridOn';
-import FileJsonIcon from '@mui/icons-material/Code';
-import FilePdfIcon from '@mui/icons-material/PictureAsPdf';
-import { AppContext } from '../../contexts/AppContext';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
-const ExportOptions = () => {
-  const { exportData, loading, results } = useContext(AppContext);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const open = Boolean(anchorEl);
+const ReceiptView = ({ data, open, onClose }) => {
+  const handlePrint = () => {
+    const pdf = new jsPDF();
 
-  const handleClick = (event) => {
-    setAnchorEl(event.currentTarget);
+    // Add title
+    pdf.setFontSize(18);
+    pdf.text('Transaction Receipt', 105, 15, { align: 'center' });
+
+    // Add transaction data
+    pdf.setFontSize(12);
+    let y = 30;
+
+    // Format the data for the PDF
+    Object.entries(data).forEach(([key, value]) => {
+      // Skip complex objects or large text fields
+      if (typeof value !== 'object' && value !== null) {
+        const text = `${key}: ${value}`;
+        pdf.text(text, 20, y);
+        y += 10;
+      }
+    });
+
+    // Check if there are tax details
+    if (data.igst || data.cgst || data.sgst || data.cess) {
+      y += 5;
+      pdf.setFontSize(14);
+      pdf.text('Tax Details', 105, y, { align: 'center' });
+      y += 10;
+      pdf.setFontSize(12);
+
+      const taxData = [
+        ['Tax Type', 'Amount'],
+        ['IGST', data.igst || 0],
+        ['CGST', data.cgst || 0],
+        ['SGST', data.sgst || 0],
+        ['Cess', data.cess || 0],
+        ['Total Tax', (data.igst || 0) + (data.cgst || 0) + (data.sgst || 0) + (data.cess || 0)]
+      ];
+
+      pdf.autoTable({
+        startY: y,
+        head: [taxData[0]],
+        body: taxData.slice(1),
+        theme: 'grid',
+        headStyles: { fillColor: [66, 135, 245] }
+      });
+    }
+
+    pdf.save('receipt.pdf');
   };
 
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Transaction Details</DialogTitle>
+      <DialogContent>
+        <Paper sx={{ p: 2 }}>
+          <Grid container spacing={2}>
+            {/* Display basic transaction info */}
+            {Object.entries(data).map(([key, value]) => {
+              // Skip displaying complex objects or large arrays
+              if (typeof value !== 'object' || value === null) {
+                return (
+                  <Grid item xs={6} key={key}>
+                    <Typography variant="body1">
+                      <strong>{key}:</strong> {String(value)}
+                    </Typography>
+                  </Grid>
+                );
+              }
+              return null;
+            })}
+          </Grid>
 
-  const handleExport = (format) => {
-    exportData(format);
-    handleClose();
-  };
+          {/* If tax data is available, display it separately */}
+          {(data.igst || data.cgst || data.sgst || data.cess) && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" gutterBottom>Tax Details</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={3}>
+                  <Typography><strong>IGST:</strong> {data.igst || 0}</Typography>
+                </Grid>
+                <Grid item xs={3}>
+                  <Typography><strong>CGST:</strong> {data.cgst || 0}</Typography>
+                </Grid>
+                <Grid item xs={3}>
+                  <Typography><strong>SGST:</strong> {data.sgst || 0}</Typography>
+                </Grid>
+                <Grid item xs={3}>
+                  <Typography><strong>Cess:</strong> {data.cess || 0}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography><strong>Total Tax:</strong> {(data.igst || 0) + (data.cgst || 0) + (data.sgst || 0) + (data.cess || 0)}</Typography>
+                </Grid>
+              </Grid>
+            </>
+          )}
 
-  const exportOptions = [
-    {
-      label: 'Excel (.xlsx)',
-      icon: <FileExcelIcon />,
-      format: 'excel',
-    },
-    {
-      label: 'CSV (.csv)',
-      icon: <FileCsvIcon />,
-      format: 'csv',
-    },
-    {
-      label: 'JSON (.json)',
-      icon: <FileJsonIcon />,
-      format: 'json',
-    },
-    {
-      label: 'PDF (.pdf)',
-      icon: <FilePdfIcon />,
-      format: 'pdf',
-    },
-  ];
+          {/* If ITC data is available, display it */}
+          {(data.itc_igst || data.itc_cgst || data.itc_sgst || data.itc_cess) && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" gutterBottom>Input Tax Credit</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={3}>
+                  <Typography><strong>ITC IGST:</strong> {data.itc_igst || 0}</Typography>
+                </Grid>
+                <Grid item xs={3}>
+                  <Typography><strong>ITC CGST:</strong> {data.itc_cgst || 0}</Typography>
+                </Grid>
+                <Grid item xs={3}>
+                  <Typography><strong>ITC SGST:</strong> {data.itc_sgst || 0}</Typography>
+                </Grid>
+                <Grid item xs={3}>
+                  <Typography><strong>ITC Cess:</strong> {data.itc_cess || 0}</Typography>
+                </Grid>
+              </Grid>
+            </>
+          )}
+        </Paper>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        <Button onClick={handlePrint} variant="contained" color="primary">Print Receipt</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+export default ReceiptView;
+```
+
+```jsx
+// client/src/components/ReportSummary.js
+import React from 'react';
+import {
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Box,
+  Divider
+} from '@mui/material';
+
+const ReportSummary = ({ data }) => {
+  if (!data) return null;
+
+  const { company, period, sections } = data;
 
   return (
     <Box>
-      <Button
-        variant="contained"
-        color="primary"
-        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <DownloadIcon />}
-        onClick={handleClick}
-        disabled={loading || !results || results.length === 0}
-      >
-        {loading ? 'Exporting...' : 'Export Data'}
-      </Button>
-      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-        {exportOptions.map((option) => (
-          <MenuItem
-            key={option.format}
-            onClick={() => handleExport(option.format)}
-            disabled={loading}
-          >
-            <ListItemIcon>{option.icon}</ListItemIcon>
-            <ListItemText>{option.label}</ListItemText>
-          </MenuItem>
-        ))}
-      </Menu>
-    </Box>
-  );
-};
-
-export default ExportOptions;
-```
-
-**frontend/src/components/common/LoadingIndicator.jsx**
-```jsx
-import React from 'react';
-import { Backdrop, CircularProgress, Box, Typography } from '@mui/material';
-
-const LoadingIndicator = ({ open, message = 'Loading...' }) => {
-  return (
-    <Backdrop
-      sx={{
-        color: '#fff',
-        zIndex: (theme) => theme.zIndex.drawer + 1,
-        flexDirection: 'column'
-      }}
-      open={open}
-    >
-      <CircularProgress color="inherit" />
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="body1">{message}</Typography>
-      </Box>
-    </Backdrop>
-  );
-};
-
-export default LoadingIndicator;
-```
-
-**frontend/src/App.jsx**
-```jsx
-import React, { useContext } from 'react';
-import { Box, CssBaseline, Toolbar, Paper, Stack } from '@mui/material';
-import { ToastContainer } from 'react-toastify';
-import { ThemeProvider } from '@mui/material/styles';
-import theme from './theme';
-import Header from './components/common/Header';
-import Sidebar from './components/common/Sidebar';
-import ResultsTable from './components/results/ResultsTable';
-import JsonViewer from './components/results/JsonViewer';
-import ViewToggle from './components/results/ViewToggle';
-import ExportOptions from './components/export/ExportOptions';
-import LoadingIndicator from './components/common/LoadingIndicator';
-import { AppContext, AppProvider } from './contexts/AppContext';
-import 'react-toastify/dist/ReactToastify.css';
-
-// Main content area
-const MainContent = () => {
-  const { viewType, loading } = useContext(AppContext);
-
-  return (
-    <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-      <Toolbar />
-      <Paper sx={{ p: 2 }}>
-        <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-          <ViewToggle />
-          <Box sx={{ flexGrow: 1 }} />
-          <ExportOptions />
-        </Stack>
-
-        {viewType === 'table' ? <ResultsTable /> : <JsonViewer />}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>GSTR-3B Report</Typography>
+        <Typography><strong>Company:</strong> {company.name}</Typography>
+        <Typography><strong>GSTIN:</strong> {company.gstin}</Typography>
+        <Typography><strong>Address:</strong> {company.address}</Typography>
+        <Typography><strong>Period:</strong> {period.month}/{period.year}</Typography>
       </Paper>
 
-      <LoadingIndicator open={loading} />
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          3.1 Details of Outward Supplies and inward supplies liable to reverse charge
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Nature of Supplies</TableCell>
+                <TableCell align="right">Taxable Value</TableCell>
+                <TableCell align="right">IGST</TableCell>
+                <TableCell align="right">CGST</TableCell>
+                <TableCell align="right">SGST</TableCell>
+                <TableCell align="right">Cess</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <TableRow>
+                <TableCell>(a) Outward taxable supplies (zero rated)</TableCell>
+                <TableCell align="right">{sections['3.1'].a.taxableValue.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].a.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].a.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].a.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].a.cess.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>(b) Outward taxable supplies (other than zero rated)</TableCell>
+                <TableCell align="right">{sections['3.1'].b.taxableValue.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].b.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].b.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].b.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].b.cess.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>(c) Other outward supplies (nil rated, exempted)</TableCell>
+                <TableCell align="right">{sections['3.1'].c.taxableValue.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].c.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].c.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].c.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].c.cess.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>(d) Inward supplies (liable to reverse charge)</TableCell>
+                <TableCell align="right">{sections['3.1'].d.taxableValue.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].d.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].d.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].d.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].d.cess.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>(e) Non-GST outward supplies</TableCell>
+                <TableCell align="right">{sections['3.1'].e.taxableValue.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].e.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].e.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].e.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['3.1'].e.cess.toFixed(2)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          4. Eligible ITC
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Details</TableCell>
+                <TableCell align="right">IGST</TableCell>
+                <TableCell align="right">CGST</TableCell>
+                <TableCell align="right">SGST</TableCell>
+                <TableCell align="right">Cess</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <TableRow>
+                <TableCell>(a) Import of goods</TableCell>
+                <TableCell align="right">{sections['4'].a.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].a.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].a.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].a.cess.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>(b) Import of services</TableCell>
+                <TableCell align="right">{sections['4'].b.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].b.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].b.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].b.cess.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>(c) ITC on reverse charge</TableCell>
+                <TableCell align="right">{sections['4'].c.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].c.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].c.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].c.cess.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>(d) ITC on inward supplies from ISD</TableCell>
+                <TableCell align="right">{sections['4'].d.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].d.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].d.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].d.cess.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>(e) All other ITC</TableCell>
+                <TableCell align="right">{sections['4'].e.igst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].e.cgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].e.sgst.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['4'].e.cess.toFixed(2)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          5. Exempt, nil-rated and non-GST inward supplies
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Details</TableCell>
+                <TableCell align="right">Inter-State Supplies</TableCell>
+                <TableCell align="right">Intra-State Supplies</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <TableRow>
+                <TableCell>(a) From composition taxable persons, exempt and nil rated</TableCell>
+                <TableCell align="right">{sections['5'].a.interState.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['5'].a.intraState.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>(b) Non-GST supply</TableCell>
+                <TableCell align="right">{sections['5'].b.interState.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['5'].b.intraState.toFixed(2)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          6.1 Payment of tax
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Description</TableCell>
+                <TableCell align="right">Tax</TableCell>
+                <TableCell align="right">Interest</TableCell>
+                <TableCell align="right">Late Fee</TableCell>
+                <TableCell align="right">Penalty</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <TableRow>
+                <TableCell>IGST</TableCell>
+                <TableCell align="right">{sections['6.1'].igst.tax.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].igst.interest.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].igst.lateFee.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].igst.penalty.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>CGST</TableCell>
+                <TableCell align="right">{sections['6.1'].cgst.tax.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].cgst.interest.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].cgst.lateFee.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].cgst.penalty.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>SGST</TableCell>
+                <TableCell align="right">{sections['6.1'].sgst.tax.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].sgst.interest.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].sgst.lateFee.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].sgst.penalty.toFixed(2)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>CESS</TableCell>
+                <TableCell align="right">{sections['6.1'].cess.tax.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].cess.interest.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].cess.lateFee.toFixed(2)}</TableCell>
+                <TableCell align="right">{sections['6.1'].cess.penalty.toFixed(2)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
     </Box>
   );
 };
 
-// App component with providers
-const App = () => {
-  return (
-    <ThemeProvider theme={theme}>
-      <AppProvider>
-        <Box sx={{ display: 'flex' }}>
-          <CssBaseline />
-          <Header />
-          <Sidebar />
-          <MainContent />
-          <ToastContainer position="bottom-right" theme="colored" />
-        </Box>
-      </AppProvider>
-    </ThemeProvider>
-  );
-};
-
-export default App;
+export default ReportSummary;
 ```
 
-**frontend/src/index.jsx**
-```jsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
+## Package.json Files
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+### Backend package.json
+
+```json
+{
+  "name": "mongodb-explorer-server",
+  "version": "1.0.0",
+  "description": "Backend for MongoDB Data Explorer with GST Reports",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "exceljs": "^4.3.0",
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.7.0",
+    "helmet": "^7.0.0",
+    "json2csv": "^6.0.0",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.5.28",
+    "mongodb": "^5.3.0",
+    "morgan": "^1.10.0",
+    "pdf-lib": "^1.17.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0",
+    "nodemon": "^2.0.22",
+    "supertest": "^6.3.3"
+  }
+}
 ```
 
-## Docker Configuration (Optional)
+### Frontend package.json
 
-**docker-compose.yml**
-```yaml
-version: '3.8'
-
-services:
-  backend:
-    build:
-      context: ./backend
-    ports:
-      - "5000:5000"
-    environment:
-      - PORT=5000
-      - MONGODB_URI=mongodb://mongodb:27017/yourdatabase
-      - NODE_ENV=production
-    depends_on:
-      - mongodb
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-
-  mongodb:
-    image: mongo:latest
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    restart: unless-stopped
-
-volumes:
-  mongodb_data:
-```
-
-**backend/Dockerfile**
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-
-RUN npm ci --only=production
-
-COPY . .
-
-EXPOSE 5000
-
-CMD ["node", "server.js"]
-```
-
-**frontend/Dockerfile**
-```dockerfile
-FROM node:18-alpine as build
-
-WORKDIR /app
-
-COPY package*.json ./
-
-RUN npm ci
-
-COPY . .
-
-RUN npm run build
-
-FROM nginx:alpine
-
-COPY --from=build /app/build /usr/share/nginx/html
-
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-**frontend/nginx.conf**
-```
-server {
-    listen 80;
-
-    location / {
-        root /usr/share/nginx/html;
-        index index.html index.htm;
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://backend:5000/api;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
+```json
+{
+  "name": "mongodb-explorer-client",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "^11.10.6",
+    "@emotion/styled": "^11.10.6",
+    "@mui/icons-material": "^5.11.16",
+    "@mui/material": "^5.12.1",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.5.28",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.10.0",
+    "react-scripts": "5.0.1",
+    "react-syntax-highlighter": "^15.5.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
 }
 ```
 
 ## README.md
 
 ```markdown
-# MongoDB Data Exploration Tool with GST Integration
+# MongoDB Data Exploration Tool with GSTR-3B Report Generation
 
-A full-stack web application for exploring MongoDB data with GST calculation capabilities built using Node.js, Express, React.js, and Material UI.
+A full-stack application for exploring MongoDB data and generating GSTR-3B reports.
 
 ## Features
 
-- Browse MongoDB collections and data
-- Dynamically explore collection fields
-- View data in table or JSON format
-- Apply GST calculations on numeric fields
-- Export data in multiple formats (Excel, CSV, JSON, PDF)
-- Generate GST-inclusive receipts for individual documents
-- Responsive design that works on all devices
+- List and explore MongoDB collections
+- Dynamically fetch and select document fields
+- Query MongoDB data with field selection and limits
+- Toggle between table and JSON views
+- Export results to Excel, CSV, JSON, and PDF formats
+- GSTR-3B Report generation for GST compliance
+- Transaction receipt view with print functionality
+- Responsive Material UI design
 
 ## Tech Stack
 
-### Backend
-- Node.js
-- Express.js
-- MongoDB (Official Driver)
+- **Backend:** Node.js, Express.js
+- **Database:** MongoDB
+- **Frontend:** React.js, Material UI
+- **File Export:** Excel.js, PapaParser, jsPDF
 
-### Frontend
-- React.js
-- Material UI (MUI v5)
-- React Context for state management
-- xlsx, papaparse, jspdf for export functionality
-
-## Setup and Installation
+## Setup Instructions
 
 ### Prerequisites
-- Node.js v14+ and npm
-- MongoDB instance (local or remote)
+
+- Node.js (v14 or later)
+- MongoDB (v4 or later)
 
 ### Backend Setup
-1. Navigate to the backend directory:
+
+1. Navigate to the server directory:
    ```
-   cd backend
+   cd server
    ```
 
 2. Install dependencies:
@@ -2538,23 +2256,25 @@ A full-stack web application for exploring MongoDB data with GST calculation cap
    npm install
    ```
 
-3. Create a `.env` file based on `.env.example`:
+3. Create a `.env` file in the server directory with the following variables:
    ```
    PORT=5000
-   MONGODB_URI=mongodb://localhost:27017/yourdbname
-   RATE_LIMIT_WINDOW_MS=60000
-   RATE_LIMIT_MAX_REQUESTS=100
+   MONGODB_URI=mongodb://username:password@localhost:27017/database
+   NODE_ENV=development
+   RATE_LIMIT_WINDOW_MS=900000
+   RATE_LIMIT_MAX=100
    ```
 
 4. Start the server:
    ```
-   npm start
+   npm run dev
    ```
 
 ### Frontend Setup
-1. Navigate to the frontend directory:
+
+1. Navigate to the client directory:
    ```
-   cd frontend
+   cd client
    ```
 
 2. Install dependencies:
@@ -2562,74 +2282,79 @@ A full-stack web application for exploring MongoDB data with GST calculation cap
    npm install
    ```
 
-3. Create a `.env` file:
+3. Create a `.env` file in the client directory with:
    ```
    REACT_APP_API_URL=http://localhost:5000/api
    ```
 
-4. Start the development server:
+4. Start the React development server:
    ```
    npm start
    ```
 
-5. Build for production:
-   ```
-   npm run build
-   ```
-
-### Docker Setup (Optional)
-1. Make sure Docker and Docker Compose are installed
-2. Run:
-   ```
-   docker-compose up -d
-   ```
-
 ## API Endpoints
 
-- `GET /api/collections`: Get all available collections
-- `GET /api/fields?collection={collectionName}`: Get fields from a collection
-- `POST /api/query`: Execute query with optional GST calculation
-- `POST /api/export`: Export data in specified format
-- `POST /api/receipt/{collection}/{documentId}`: Generate receipt for a document
+- **GET /api/collections**: List all MongoDB collections
+- **GET /api/fields?collection=name**: Get fields for a specific collection
+- **POST /api/query**: Execute a query on a collection
+- **POST /api/export**: Export data in various formats
+- **POST /api/report/gstr3b**: Generate a GSTR-3B report
 
-## GST Calculation
+## MongoDB Document Schema
 
-GST is calculated using the formula:
+The application expects the following collections and schemas for GSTR-3B report generation:
+
+### Companies Collection
+```json
+{
+  "_id": "ObjectId",
+  "name": "String",
+  "gstin": "String",
+  "address": "String"
+}
 ```
-GST Amount = Field Value × GST Percentage / 100
-Total Amount = Field Value + GST Amount
+
+### Transactions Collection
+```json
+{
+  "_id": "ObjectId",
+  "companyId": "ObjectId",
+  "date": "Date",
+  "type": "String", // "outward", "inward", "payment"
+  "subType": "String", // "zeroRated", "taxable", "nilRated", "exempt", "nonGST", etc.
+  "taxableValue": "Number",
+  "igst": "Number",
+  "cgst": "Number",
+  "sgst": "Number",
+  "cess": "Number",
+  "reverseCharge": "Boolean",
+  "intraState": "Boolean"
+}
 ```
-
-The application allows users to:
-1. Enable/disable GST calculation
-2. Select which field to apply GST on
-3. Choose GST percentage (5%, 12%, 18%, 28%)
-4. View calculated GST and total amounts in results
-5. Include GST calculations in exports and receipts
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -m 'Add feature'`
-4. Push to the branch: `git push origin feature-name`
-5. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 ```
 
-## Project Summary
+## Summary
 
-This MongoDB Data Exploration Tool with GST integration provides a comprehensive solution for exploring MongoDB data while adding valuable GST calculation functionality. The application is built with modern MERN stack technologies and follows best practices for code organization, state management, and UI/UX design.
+This MongoDB Data Exploration Tool with GSTR-3B Report Generation provides a complete solution for:
 
-Key features include:
-1. Dynamic collection and field exploration
-2. GST calculation on selected fields with customizable rates
-3. Multiple data view formats (table and JSON)
-4. Export capabilities in various formats (Excel, CSV, JSON, PDF)
-5. Receipt generation with GST details
-6. Responsive design for all devices
+1. Exploring MongoDB collections and documents
+2. Selecting specific fields and filtering data
+3. Viewing results in table or JSON format
+4. Exporting data in various formats (Excel, CSV, JSON, PDF)
+5. Generating GSTR-3B reports for GST compliance
+6. Viewing transaction receipts with print functionality
 
-The application architecture separates concerns properly with a backend handling MongoDB operations and a clean, modular React frontend with Material UI components. The state management utilizes React Context API for shared state and local storage for persistence of user preferences.
+The application follows modern best practices for MERN stack development, including:
+
+1. Clean, modular code structure
+2. Proper error handling
+3. Responsive UI design with Material UI
+4. Secure API endpoints with rate limiting
+5. Efficient data transformation for performance
+6. Comprehensive documentation
+
+The implementation is production-ready and can be easily extended with additional features as needed.

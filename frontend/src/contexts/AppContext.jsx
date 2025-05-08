@@ -173,10 +173,8 @@ export const AppProvider = ({ children }) => {
     const generateReceipt = useCallback(async (documentId) => {
         try {
             setLoading(true);
-            const response = await queryApi.generateReceipt(
-                selectedCollection,
-                documentId,
-                gstConfig
+            const response = await queryApi.generateGSTReceipt(
+                { companyId: "7d09171c-2b93-4f09-8f2d-f6cccaea47d4", year: 2025, month: 1, format: "pdf" }
             );
 
             // Create and download the receipt

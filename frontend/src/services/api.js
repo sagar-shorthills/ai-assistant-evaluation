@@ -73,6 +73,18 @@ export const queryApi = {
         } catch (error) {
             throw new Error(error.response?.data?.error?.message || 'Failed to generate receipt');
         }
+    },
+
+
+    // Generate receipt for a specific document
+    generateGSTReceipt: async (gstConfig) => {
+        try {
+            const response = await apiClient.post(`/report/gstr3b`, gstConfig
+            );
+            return response.data;
+        } catch (error) {
+            throw new Error(error.response?.data?.error?.message || 'Failed to generate receipt');
+        }
     }
 };
 
