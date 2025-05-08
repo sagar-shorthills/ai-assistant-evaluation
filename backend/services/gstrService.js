@@ -13,62 +13,86 @@ require('jspdf-autotable'); // This adds autoTable method to jsPDF prototype
 exports.generateGstr3bReport = async (companyId, year, month) => {
     try {
         // Get required collections
-        const transactionsCollection = await getCollection('transactions');
+        const supplyTransactionsCollection = await getCollection('supply_transactions');
+        const itcPaymentsCollection = await getCollection('itc_payments');
         const companiesCollection = await getCollection('companies');
 
         // Get company information
-        // const company = await companiesCollection.findOne({ _id: companyId });
-        // if (!company) {
-        //     throw new Error(`Company with ID ${companyId} not found`);
-        // }
+        const company = await companiesCollection.findOne({ _id: companyId });
+        if (!company) {
+            throw new Error(`Company with ID ${companyId} not found`);
+        }
 
-        // Calculate date range for the month
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0); // Last day of the month
-
-        // Find all transactions for the company in the specified month
-        const transactions = await transactionsCollection.find({
+        // Find all supply transactions for the company in the specified month
+        const supplyTransactions = await supplyTransactionsCollection.find({
             companyId,
-            date: {
-                $gte: startDate,
-                $lte: endDate
+            period: {
+                year,
+                month
+            }
+        }).toArray();
+
+        // Find all ITC payments for the company in the specified month
+        const itcPayments = await itcPaymentsCollection.find({
+            companyId,
+            period: {
+                year,
+                month
             }
         }).toArray();
 
         // Initialize report structure
         const report = {
             header: {
-                gstin: "Some",
-                legalName: "ABC Entity",
-                tradeName: "ABC Entity",
+                gstin: company.gstin,
+                legalName: company.legalName,
+                tradeName: company.tradeName,
                 period: {
                     month,
                     year
-                }
+                },
+                arn: "AA160125035845A",
+                arnDate: "20/02/2025",
+                authorizedSignatory: company.authorizedSignatory
             },
             section3_1: {
                 // Outward taxable supplies (other than zero rated, nil rated and exempted)
-                outward_taxable: calculateOutwardTaxable(transactions),
+                outward_taxable: calculateOutwardTaxable(supplyTransactions),
                 // Outward taxable supplies (zero rated)
-                outward_zero: calculateOutwardZeroRated(transactions),
+                outward_zero: calculateOutwardZeroRated(supplyTransactions),
                 // Other outward supplies (nil rated, exempted)
-                outward_nil_exempt: calculateOutwardNilExempt(transactions),
+                outward_nil_exempt: calculateOutwardNilExempt(supplyTransactions),
                 // Inward supplies (liable to reverse charge)
-                inward_reverse_charge: calculateInwardReverseCharge(transactions),
+                inward_reverse_charge: calculateInwardReverseCharge(supplyTransactions),
                 // Non-GST outward supplies
-                non_gst_outward: calculateNonGstOutward(transactions)
+                non_gst_outward: calculateNonGstOutward(supplyTransactions)
+            },
+            section3_1_1: {
+                // Details regarding section 9(5) supplies
+                ecommerce_operator: calculateEcommerceOperatorSupplies(supplyTransactions)
+            },
+            section3_2: {
+                // Inter-state supplies
+                unregistered: calculateInterstateUnregistered(supplyTransactions),
+                composition: calculateInterstateComposition(supplyTransactions),
+                uin: calculateInterstateUIN(supplyTransactions)
             },
             section4: {
                 // ITC details - eligible, reversed, net
-                itc: calculateITC(transactions)
+                itc: calculateITC(supplyTransactions, itcPayments)
             },
             section5: {
                 // Exempt, nil-rated and non-GST inward supplies
-                exempt_nil_non_gst: calculateExemptNilNonGst(transactions)
+                exempt_nil_non_gst: calculateExemptNilNonGst(supplyTransactions)
+            },
+            section5_1: {
+                // Interest and Late Fees
+                interest: calculateInterest(itcPayments),
+                lateFee: calculateLateFee(itcPayments)
             },
             section6: {
                 // Tax payment details
-                payment: calculatePayment(transactions)
+                payment: calculatePayment(supplyTransactions, itcPayments)
             }
         };
 
@@ -88,36 +112,33 @@ function calculateOutwardTaxable(transactions) {
     // Initialize result structure
     const result = {
         taxableValue: 0,
-        igst: 0,
-        cgst: 0,
-        sgst: 0,
+        integrated: 0,
+        central: 0,
+        state: 0,
         cess: 0
     };
 
     // Filter and process outward taxable transactions
     const outwardTaxable = transactions.filter(tx =>
-        tx.type === 'outward' &&
-        tx.subType === 'taxable' &&
-        tx.gstType !== 'zero_rated' &&
-        tx.gstType !== 'nil_rated' &&
-        tx.gstType !== 'exempted'
+        tx.type === 'OUTWARD' &&
+        tx.subType === 'TAXABLE'
     );
 
     // Calculate totals
     outwardTaxable.forEach(tx => {
         result.taxableValue += tx.taxableValue || 0;
-        result.igst += tx.igst || 0;
-        result.cgst += tx.cgst || 0;
-        result.sgst += tx.sgst || 0;
-        result.cess += tx.cess || 0;
+        result.integrated += tx.tax.integrated || 0;
+        result.central += tx.tax.central || 0;
+        result.state += tx.tax.state || 0;
+        result.cess += tx.tax.cess || 0;
     });
 
     // Round to 2 decimal places
     return {
         taxableValue: parseFloat(result.taxableValue.toFixed(2)),
-        igst: parseFloat(result.igst.toFixed(2)),
-        cgst: parseFloat(result.cgst.toFixed(2)),
-        sgst: parseFloat(result.sgst.toFixed(2)),
+        integrated: parseFloat(result.integrated.toFixed(2)),
+        central: parseFloat(result.central.toFixed(2)),
+        state: parseFloat(result.state.toFixed(2)),
         cess: parseFloat(result.cess.toFixed(2))
     };
 }
@@ -131,27 +152,27 @@ function calculateOutwardZeroRated(transactions) {
     // Initialize result structure
     const result = {
         taxableValue: 0,
-        igst: 0,
+        integrated: 0,
         cess: 0
     };
 
     // Filter and process outward zero rated transactions
     const outwardZero = transactions.filter(tx =>
-        tx.type === 'outward' &&
-        tx.gstType === 'zero_rated'
+        tx.type === 'OUTWARD' &&
+        tx.subType === 'ZERO_RATED'
     );
 
     // Calculate totals
     outwardZero.forEach(tx => {
         result.taxableValue += tx.taxableValue || 0;
-        result.igst += tx.igst || 0;
-        result.cess += tx.cess || 0;
+        result.integrated += tx.tax.integrated || 0;
+        result.cess += tx.tax.cess || 0;
     });
 
     // Round to 2 decimal places
     return {
         taxableValue: parseFloat(result.taxableValue.toFixed(2)),
-        igst: parseFloat(result.igst.toFixed(2)),
+        integrated: parseFloat(result.integrated.toFixed(2)),
         cess: parseFloat(result.cess.toFixed(2))
     };
 }
@@ -164,8 +185,8 @@ function calculateOutwardZeroRated(transactions) {
 function calculateOutwardNilExempt(transactions) {
     // Filter and process outward nil-rated and exempted transactions
     const outwardNilExempt = transactions.filter(tx =>
-        tx.type === 'outward' &&
-        (tx.gstType === 'nil_rated' || tx.gstType === 'exempted')
+        tx.type === 'OUTWARD' &&
+        tx.subType === 'EXEMPT'
     );
 
     // Calculate total taxable value
@@ -187,33 +208,33 @@ function calculateInwardReverseCharge(transactions) {
     // Initialize result structure
     const result = {
         taxableValue: 0,
-        igst: 0,
-        cgst: 0,
-        sgst: 0,
+        integrated: 0,
+        central: 0,
+        state: 0,
         cess: 0
     };
 
     // Filter and process inward reverse charge transactions
     const inwardRC = transactions.filter(tx =>
-        tx.type === 'inward' &&
-        tx.reverseCharge === true
+        tx.type === 'INWARD' &&
+        tx.subType === 'RCM'
     );
 
     // Calculate totals
     inwardRC.forEach(tx => {
         result.taxableValue += tx.taxableValue || 0;
-        result.igst += tx.igst || 0;
-        result.cgst += tx.cgst || 0;
-        result.sgst += tx.sgst || 0;
-        result.cess += tx.cess || 0;
+        result.integrated += tx.tax.integrated || 0;
+        result.central += tx.tax.central || 0;
+        result.state += tx.tax.state || 0;
+        result.cess += tx.tax.cess || 0;
     });
 
     // Round to 2 decimal places
     return {
         taxableValue: parseFloat(result.taxableValue.toFixed(2)),
-        igst: parseFloat(result.igst.toFixed(2)),
-        cgst: parseFloat(result.cgst.toFixed(2)),
-        sgst: parseFloat(result.sgst.toFixed(2)),
+        integrated: parseFloat(result.integrated.toFixed(2)),
+        central: parseFloat(result.central.toFixed(2)),
+        state: parseFloat(result.state.toFixed(2)),
         cess: parseFloat(result.cess.toFixed(2))
     };
 }
@@ -226,8 +247,8 @@ function calculateInwardReverseCharge(transactions) {
 function calculateNonGstOutward(transactions) {
     // Filter and process non-GST outward transactions
     const nonGstOutward = transactions.filter(tx =>
-        tx.type === 'outward' &&
-        tx.gstType === 'non_gst'
+        tx.type === 'OUTWARD' &&
+        tx.subType === 'NON_GST'
     );
 
     // Calculate total taxable value
@@ -241,61 +262,249 @@ function calculateNonGstOutward(transactions) {
 }
 
 /**
- * Calculate Input Tax Credit (ITC) details
+ * Calculate e-commerce operator supplies
  * @param {Array} transactions - Array of transaction objects
+ * @returns {Object} Calculated values
+ */
+function calculateEcommerceOperatorSupplies(transactions) {
+    // Initialize result structure
+    const result = {
+        taxableValue: 0,
+        integrated: 0,
+        central: 0,
+        state: 0,
+        cess: 0
+    };
+
+    // Filter and process e-commerce operator transactions
+    const ecommerceTxs = transactions.filter(tx =>
+        tx.type === 'OUTWARD' &&
+        tx.subType === 'TAXABLE' &&
+        tx.isEcommerceOperator === true
+    );
+
+    // Calculate totals
+    ecommerceTxs.forEach(tx => {
+        result.taxableValue += tx.taxableValue || 0;
+        result.integrated += tx.tax.integrated || 0;
+        result.central += tx.tax.central || 0;
+        result.state += tx.tax.state || 0;
+        result.cess += tx.tax.cess || 0;
+    });
+
+    // Round to 2 decimal places
+    return {
+        taxableValue: parseFloat(result.taxableValue.toFixed(2)),
+        integrated: parseFloat(result.integrated.toFixed(2)),
+        central: parseFloat(result.central.toFixed(2)),
+        state: parseFloat(result.state.toFixed(2)),
+        cess: parseFloat(result.cess.toFixed(2))
+    };
+}
+
+/**
+ * Calculate inter-state supplies to unregistered persons
+ * @param {Array} transactions - Array of transaction objects
+ * @returns {Object} Calculated values
+ */
+function calculateInterstateUnregistered(transactions) {
+    // Initialize result structure
+    const result = {
+        taxableValue: 0,
+        integrated: 0,
+        central: 0,
+        state: 0,
+        cess: 0
+    };
+
+    // Filter and process inter-state unregistered transactions
+    const unregisteredTxs = transactions.filter(tx =>
+        tx.type === 'OUTWARD' &&
+        tx.subType === 'TAXABLE' &&
+        tx.counterparty.isRegistered === false &&
+        tx.isInterstate === true
+    );
+
+    // Calculate totals
+    unregisteredTxs.forEach(tx => {
+        result.taxableValue += tx.taxableValue || 0;
+        result.integrated += tx.tax.integrated || 0;
+        result.central += tx.tax.central || 0;
+        result.state += tx.tax.state || 0;
+        result.cess += tx.tax.cess || 0;
+    });
+
+    // Round to 2 decimal places
+    return {
+        taxableValue: parseFloat(result.taxableValue.toFixed(2)),
+        integrated: parseFloat(result.integrated.toFixed(2)),
+        central: parseFloat(result.central.toFixed(2)),
+        state: parseFloat(result.state.toFixed(2)),
+        cess: parseFloat(result.cess.toFixed(2))
+    };
+}
+
+/**
+ * Calculate inter-state supplies to composition taxable persons
+ * @param {Array} transactions - Array of transaction objects
+ * @returns {Object} Calculated values
+ */
+function calculateInterstateComposition(transactions) {
+    // Initialize result structure
+    const result = {
+        taxableValue: 0,
+        integrated: 0,
+        central: 0,
+        state: 0,
+        cess: 0
+    };
+
+    // Filter and process inter-state composition transactions
+    const compositionTxs = transactions.filter(tx =>
+        tx.type === 'OUTWARD' &&
+        tx.subType === 'TAXABLE' &&
+        tx.counterparty.isComposition === true &&
+        tx.isInterstate === true
+    );
+
+    // Calculate totals
+    compositionTxs.forEach(tx => {
+        result.taxableValue += tx.taxableValue || 0;
+        result.integrated += tx.tax.integrated || 0;
+        result.central += tx.tax.central || 0;
+        result.state += tx.tax.state || 0;
+        result.cess += tx.tax.cess || 0;
+    });
+
+    // Round to 2 decimal places
+    return {
+        taxableValue: parseFloat(result.taxableValue.toFixed(2)),
+        integrated: parseFloat(result.integrated.toFixed(2)),
+        central: parseFloat(result.central.toFixed(2)),
+        state: parseFloat(result.state.toFixed(2)),
+        cess: parseFloat(result.cess.toFixed(2))
+    };
+}
+
+/**
+ * Calculate inter-state supplies to UIN holders
+ * @param {Array} transactions - Array of transaction objects
+ * @returns {Object} Calculated values
+ */
+function calculateInterstateUIN(transactions) {
+    // Initialize result structure
+    const result = {
+        taxableValue: 0,
+        integrated: 0,
+        central: 0,
+        state: 0,
+        cess: 0
+    };
+
+    // Filter and process inter-state UIN transactions
+    const uinTxs = transactions.filter(tx =>
+        tx.type === 'OUTWARD' &&
+        tx.subType === 'TAXABLE' &&
+        tx.counterparty.isUIN === true &&
+        tx.isInterstate === true
+    );
+
+    // Calculate totals
+    uinTxs.forEach(tx => {
+        result.taxableValue += tx.taxableValue || 0;
+        result.integrated += tx.tax.integrated || 0;
+        result.central += tx.tax.central || 0;
+        result.state += tx.tax.state || 0;
+        result.cess += tx.tax.cess || 0;
+    });
+
+    // Round to 2 decimal places
+    return {
+        taxableValue: parseFloat(result.taxableValue.toFixed(2)),
+        integrated: parseFloat(result.integrated.toFixed(2)),
+        central: parseFloat(result.central.toFixed(2)),
+        state: parseFloat(result.state.toFixed(2)),
+        cess: parseFloat(result.cess.toFixed(2))
+    };
+}
+
+/**
+ * Calculate Input Tax Credit (ITC) details
+ * @param {Array} supplyTransactions - Array of supply transaction objects
+ * @param {Array} itcPayments - Array of ITC payment objects
  * @returns {Object} Calculated ITC values
  */
-function calculateITC(transactions) {
+function calculateITC(supplyTransactions, itcPayments) {
     // Initialize result structure
     const result = {
         eligible: {
-            igst: 0,
-            cgst: 0,
-            sgst: 0,
-            cess: 0
+            import_goods: { integrated: 0, central: 0, state: 0, cess: 0 },
+            import_services: { integrated: 0, central: 0, state: 0, cess: 0 },
+            reverse_charge: { integrated: 0, central: 0, state: 0, cess: 0 },
+            isd: { integrated: 0, central: 0, state: 0, cess: 0 },
+            others: { integrated: 0, central: 0, state: 0, cess: 0 }
         },
         reversed: {
-            igst: 0,
-            cgst: 0,
-            sgst: 0,
-            cess: 0
+            rules_38_42_43: { integrated: 0, central: 0, state: 0, cess: 0 },
+            others: { integrated: 0, central: 0, state: 0, cess: 0 }
         },
         net: {
-            igst: 0,
-            cgst: 0,
-            sgst: 0,
+            integrated: 0,
+            central: 0,
+            state: 0,
             cess: 0
         }
     };
 
     // Process ITC eligible transactions
-    transactions.forEach(tx => {
+    supplyTransactions.forEach(tx => {
         if (tx.itc && tx.itc.eligible) {
-            result.eligible.igst += tx.itc.eligible.igst || 0;
-            result.eligible.cgst += tx.itc.eligible.cgst || 0;
-            result.eligible.sgst += tx.itc.eligible.sgst || 0;
-            result.eligible.cess += tx.itc.eligible.cess || 0;
+            const category = tx.itc.category || 'others';
+            result.eligible[category].integrated += tx.itc.amount.integrated || 0;
+            result.eligible[category].central += tx.itc.amount.central || 0;
+            result.eligible[category].state += tx.itc.amount.state || 0;
+            result.eligible[category].cess += tx.itc.amount.cess || 0;
         }
 
         if (tx.itc && tx.itc.reversed) {
-            result.reversed.igst += tx.itc.reversed.igst || 0;
-            result.reversed.cgst += tx.itc.reversed.cgst || 0;
-            result.reversed.sgst += tx.itc.reversed.sgst || 0;
-            result.reversed.cess += tx.itc.reversed.cess || 0;
+            const category = tx.itc.reversalCategory || 'others';
+            result.reversed[category].integrated += tx.itc.amount.integrated || 0;
+            result.reversed[category].central += tx.itc.amount.central || 0;
+            result.reversed[category].state += tx.itc.amount.state || 0;
+            result.reversed[category].cess += tx.itc.amount.cess || 0;
         }
     });
 
     // Calculate net ITC
-    result.net.igst = result.eligible.igst - result.reversed.igst;
-    result.net.cgst = result.eligible.cgst - result.reversed.cgst;
-    result.net.sgst = result.eligible.sgst - result.reversed.sgst;
-    result.net.cess = result.eligible.cess - result.reversed.cess;
+    result.net.integrated = 
+        Object.values(result.eligible).reduce((sum, cat) => sum + cat.integrated, 0) -
+        Object.values(result.reversed).reduce((sum, cat) => sum + cat.integrated, 0);
+    
+    result.net.central = 
+        Object.values(result.eligible).reduce((sum, cat) => sum + cat.central, 0) -
+        Object.values(result.reversed).reduce((sum, cat) => sum + cat.central, 0);
+    
+    result.net.state = 
+        Object.values(result.eligible).reduce((sum, cat) => sum + cat.state, 0) -
+        Object.values(result.reversed).reduce((sum, cat) => sum + cat.state, 0);
+    
+    result.net.cess = 
+        Object.values(result.eligible).reduce((sum, cat) => sum + cat.cess, 0) -
+        Object.values(result.reversed).reduce((sum, cat) => sum + cat.cess, 0);
 
     // Round all values to 2 decimal places
     Object.keys(result).forEach(category => {
-        Object.keys(result[category]).forEach(tax => {
-            result[category][tax] = parseFloat(result[category][tax].toFixed(2));
-        });
+        if (category === 'net') {
+            Object.keys(result[category]).forEach(tax => {
+                result[category][tax] = parseFloat(result[category][tax].toFixed(2));
+            });
+        } else {
+            Object.keys(result[category]).forEach(subCategory => {
+                Object.keys(result[category][subCategory]).forEach(tax => {
+                    result[category][subCategory][tax] = parseFloat(result[category][subCategory][tax].toFixed(2));
+                });
+            });
+        }
     });
 
     return result;
@@ -309,108 +518,162 @@ function calculateITC(transactions) {
 function calculateExemptNilNonGst(transactions) {
     // Initialize result structure
     const result = {
-        interstate: 0,
-        intrastate: 0
+        composition: { interstate: 0, intrastate: 0 },
+        exempt: { interstate: 0, intrastate: 0 },
+        nil_rated: { interstate: 0, intrastate: 0 },
+        non_gst: { interstate: 0, intrastate: 0 }
     };
 
     // Filter and process relevant transactions
     const filteredTxs = transactions.filter(tx =>
-        tx.type === 'inward' &&
-        (tx.gstType === 'nil_rated' || tx.gstType === 'exempted' || tx.gstType === 'non_gst')
+        tx.type === 'INWARD' &&
+        (tx.subType === 'EXEMPT' || tx.subType === 'NIL_RATED' || tx.subType === 'NON_GST')
     );
 
     // Calculate totals based on supply type
     filteredTxs.forEach(tx => {
-        if (tx.supplyType === 'interstate') {
-            result.interstate += tx.taxableValue || 0;
-        } else if (tx.supplyType === 'intrastate') {
-            result.intrastate += tx.taxableValue || 0;
+        const category = tx.subType.toLowerCase();
+        if (tx.isInterstate) {
+            result[category].interstate += tx.taxableValue || 0;
+        } else {
+            result[category].intrastate += tx.taxableValue || 0;
         }
     });
 
     // Round to 2 decimal places
-    return {
-        interstate: parseFloat(result.interstate.toFixed(2)),
-        intrastate: parseFloat(result.intrastate.toFixed(2))
+    Object.keys(result).forEach(category => {
+        Object.keys(result[category]).forEach(type => {
+            result[category][type] = parseFloat(result[category][type].toFixed(2));
+        });
+    });
+
+    return result;
+}
+
+/**
+ * Calculate interest
+ * @param {Array} itcPayments - Array of ITC payment objects
+ * @returns {Object} Calculated interest values
+ */
+function calculateInterest(itcPayments) {
+    // Initialize result structure
+    const result = {
+        computed: { integrated: 0, central: 0, state: 0, cess: 0 },
+        paid: { integrated: 0, central: 0, state: 0, cess: 0 }
     };
+
+    // Process interest payments
+    itcPayments.forEach(payment => {
+        if (payment.payment.interest) {
+            result.paid.integrated += payment.payment.interest.integrated || 0;
+            result.paid.central += payment.payment.interest.central || 0;
+            result.paid.state += payment.payment.interest.state || 0;
+            result.paid.cess += payment.payment.interest.cess || 0;
+        }
+    });
+
+    // Round to 2 decimal places
+    Object.keys(result).forEach(category => {
+        Object.keys(result[category]).forEach(tax => {
+            result[category][tax] = parseFloat(result[category][tax].toFixed(2));
+        });
+    });
+
+    return result;
+}
+
+/**
+ * Calculate late fee
+ * @param {Array} itcPayments - Array of ITC payment objects
+ * @returns {Object} Calculated late fee values
+ */
+function calculateLateFee(itcPayments) {
+    // Initialize result structure
+    const result = {
+        integrated: 0,
+        central: 0,
+        state: 0,
+        cess: 0
+    };
+
+    // Process late fee payments
+    itcPayments.forEach(payment => {
+        if (payment.payment.lateFee) {
+            result.integrated += payment.payment.lateFee.integrated || 0;
+            result.central += payment.payment.lateFee.central || 0;
+            result.state += payment.payment.lateFee.state || 0;
+            result.cess += payment.payment.lateFee.cess || 0;
+        }
+    });
+
+    // Round to 2 decimal places
+    Object.keys(result).forEach(tax => {
+        result[tax] = parseFloat(result[tax].toFixed(2));
+    });
+
+    return result;
 }
 
 /**
  * Calculate tax payment details
- * @param {Array} transactions - Array of transaction objects
+ * @param {Array} supplyTransactions - Array of supply transaction objects
+ * @param {Array} itcPayments - Array of ITC payment objects
  * @returns {Object} Calculated tax payment values
  */
-function calculatePayment(transactions) {
+function calculatePayment(supplyTransactions, itcPayments) {
     // Initialize result structure
     const result = {
         tax: {
-            igst: { cash: 0, itc: 0 },
-            cgst: { cash: 0, itc: 0 },
-            sgst: { cash: 0, itc: 0 },
+            integrated: { cash: 0, itc: 0 },
+            central: { cash: 0, itc: 0 },
+            state: { cash: 0, itc: 0 },
             cess: { cash: 0, itc: 0 }
         },
         interest: {
-            igst: 0,
-            cgst: 0,
-            sgst: 0,
+            integrated: 0,
+            central: 0,
+            state: 0,
             cess: 0
         },
         lateFee: {
-            cgst: 0,
-            sgst: 0
+            integrated: 0,
+            central: 0,
+            state: 0,
+            cess: 0
         }
     };
 
-    // Filter payment transactions
-    const payments = transactions.filter(tx => tx.type === 'payment');
+    // Process ITC payments
+    itcPayments.forEach(payment => {
+        // Process tax payments
+        if (payment.payment.cash) {
+            result.tax.integrated.cash += payment.payment.cash.integrated || 0;
+            result.tax.central.cash += payment.payment.cash.central || 0;
+            result.tax.state.cash += payment.payment.cash.state || 0;
+            result.tax.cess.cash += payment.payment.cash.cess || 0;
+        }
 
-    // Process each payment
-    payments.forEach(payment => {
-        if (payment.paymentDetails) {
-            // Process tax payments
-            if (payment.paymentDetails.tax) {
-                const tax = payment.paymentDetails.tax;
+        if (payment.payment.itcUtilised) {
+            result.tax.integrated.itc += payment.payment.itcUtilised.integrated || 0;
+            result.tax.central.itc += payment.payment.itcUtilised.central || 0;
+            result.tax.state.itc += payment.payment.itcUtilised.state || 0;
+            result.tax.cess.itc += payment.payment.itcUtilised.cess || 0;
+        }
 
-                // IGST
-                if (tax.igst) {
-                    result.tax.igst.cash += tax.igst.cash || 0;
-                    result.tax.igst.itc += tax.igst.itc || 0;
-                }
+        // Process interest payments
+        if (payment.payment.interest) {
+            result.interest.integrated += payment.payment.interest.integrated || 0;
+            result.interest.central += payment.payment.interest.central || 0;
+            result.interest.state += payment.payment.interest.state || 0;
+            result.interest.cess += payment.payment.interest.cess || 0;
+        }
 
-                // CGST
-                if (tax.cgst) {
-                    result.tax.cgst.cash += tax.cgst.cash || 0;
-                    result.tax.cgst.itc += tax.cgst.itc || 0;
-                }
-
-                // SGST
-                if (tax.sgst) {
-                    result.tax.sgst.cash += tax.sgst.cash || 0;
-                    result.tax.sgst.itc += tax.sgst.itc || 0;
-                }
-
-                // CESS
-                if (tax.cess) {
-                    result.tax.cess.cash += tax.cess.cash || 0;
-                    result.tax.cess.itc += tax.cess.itc || 0;
-                }
-            }
-
-            // Process interest payments
-            if (payment.paymentDetails.interest) {
-                const interest = payment.paymentDetails.interest;
-                result.interest.igst += interest.igst || 0;
-                result.interest.cgst += interest.cgst || 0;
-                result.interest.sgst += interest.sgst || 0;
-                result.interest.cess += interest.cess || 0;
-            }
-
-            // Process late fee payments
-            if (payment.paymentDetails.lateFee) {
-                const lateFee = payment.paymentDetails.lateFee;
-                result.lateFee.cgst += lateFee.cgst || 0;
-                result.lateFee.sgst += lateFee.sgst || 0;
-            }
+        // Process late fee payments
+        if (payment.payment.lateFee) {
+            result.lateFee.integrated += payment.payment.lateFee.integrated || 0;
+            result.lateFee.central += payment.payment.lateFee.central || 0;
+            result.lateFee.state += payment.payment.lateFee.state || 0;
+            result.lateFee.cess += payment.payment.lateFee.cess || 0;
         }
     });
 
@@ -449,10 +712,13 @@ exports.generateGstr3bPdf = async (reportData) => {
         doc.text(`Legal Name: ${reportData.header.legalName}`, 14, 35);
         doc.text(`Trade Name: ${reportData.header.tradeName || 'N/A'}`, 14, 40);
         doc.text(`Period: ${reportData.header.period.month}/${reportData.header.period.year}`, 14, 45);
+        doc.text(`ARN: ${reportData.header.arn}`, 14, 50);
+        doc.text(`Date of ARN: ${reportData.header.arnDate}`, 14, 55);
+        doc.text(`Authorized Signatory: ${reportData.header.authorizedSignatory.name}`, 14, 60);
 
         // Section 3.1 - Outward and inward supplies
         doc.setFontSize(12);
-        doc.text('3.1 Outward and inward supplies', 14, 55);
+        doc.text('3.1 Outward and inward supplies', 14, 70);
 
         // Table for section 3.1
         const section31Headers = ['Nature of Supplies', 'Taxable Value', 'IGST', 'CGST', 'SGST', 'CESS'];
@@ -460,16 +726,16 @@ exports.generateGstr3bPdf = async (reportData) => {
         const section31Data = [
             ['(a) Outward taxable supplies',
                 reportData.section3_1.outward_taxable.taxableValue,
-                reportData.section3_1.outward_taxable.igst,
-                reportData.section3_1.outward_taxable.cgst,
-                reportData.section3_1.outward_taxable.sgst,
+                reportData.section3_1.outward_taxable.integrated,
+                reportData.section3_1.outward_taxable.central,
+                reportData.section3_1.outward_taxable.state,
                 reportData.section3_1.outward_taxable.cess],
             ['(b) Outward taxable supplies (zero rated)',
                 reportData.section3_1.outward_zero.taxableValue,
-                reportData.section3_1.outward_zero.igst,
-                reportData.section3_1.outward_zero.cess,
+                reportData.section3_1.outward_zero.integrated,
                 '',
-                ''],
+                '',
+                reportData.section3_1.outward_zero.cess],
             ['(c) Other outward supplies (Nil rated, exempted)',
                 reportData.section3_1.outward_nil_exempt.taxableValue,
                 '',
@@ -478,9 +744,9 @@ exports.generateGstr3bPdf = async (reportData) => {
                 ''],
             ['(d) Inward supplies (liable to reverse charge)',
                 reportData.section3_1.inward_reverse_charge.taxableValue,
-                reportData.section3_1.inward_reverse_charge.igst,
-                reportData.section3_1.inward_reverse_charge.cgst,
-                reportData.section3_1.inward_reverse_charge.sgst,
+                reportData.section3_1.inward_reverse_charge.integrated,
+                reportData.section3_1.inward_reverse_charge.central,
+                reportData.section3_1.inward_reverse_charge.state,
                 reportData.section3_1.inward_reverse_charge.cess],
             ['(e) Non-GST outward supplies',
                 reportData.section3_1.non_gst_outward.taxableValue,
@@ -493,7 +759,73 @@ exports.generateGstr3bPdf = async (reportData) => {
         doc.autoTable({
             head: [section31Headers],
             body: section31Data,
-            startY: 60,
+            startY: 75,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [66, 66, 66],
+                textColor: 255,
+                fontStyle: 'bold'
+            }
+        });
+
+        // Section 3.1.1 - E-commerce operator supplies
+        doc.setFontSize(12);
+        let currentY = doc.lastAutoTable.finalY + 10;
+        doc.text('3.1.1 Details regarding section 9(5) supplies', 14, currentY);
+
+        const section311Headers = ['Nature of Supplies', 'Taxable Value', 'IGST', 'CGST', 'SGST', 'CESS'];
+        const section311Data = [
+            ['Supplies through e-commerce operators',
+                reportData.section3_1_1.ecommerce_operator.taxableValue,
+                reportData.section3_1_1.ecommerce_operator.integrated,
+                reportData.section3_1_1.ecommerce_operator.central,
+                reportData.section3_1_1.ecommerce_operator.state,
+                reportData.section3_1_1.ecommerce_operator.cess]
+        ];
+
+        doc.autoTable({
+            head: [section311Headers],
+            body: section311Data,
+            startY: currentY + 5,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [66, 66, 66],
+                textColor: 255,
+                fontStyle: 'bold'
+            }
+        });
+
+        // Section 3.2 - Inter-state supplies
+        doc.setFontSize(12);
+        currentY = doc.lastAutoTable.finalY + 10;
+        doc.text('3.2 Inter-state supplies', 14, currentY);
+
+        const section32Headers = ['Nature of Supplies', 'Taxable Value', 'IGST', 'CGST', 'SGST', 'CESS'];
+        const section32Data = [
+            ['Supplies to unregistered persons',
+                reportData.section3_2.unregistered.taxableValue,
+                reportData.section3_2.unregistered.integrated,
+                reportData.section3_2.unregistered.central,
+                reportData.section3_2.unregistered.state,
+                reportData.section3_2.unregistered.cess],
+            ['Supplies to composition taxable persons',
+                reportData.section3_2.composition.taxableValue,
+                reportData.section3_2.composition.integrated,
+                reportData.section3_2.composition.central,
+                reportData.section3_2.composition.state,
+                reportData.section3_2.composition.cess],
+            ['Supplies to UIN holders',
+                reportData.section3_2.uin.taxableValue,
+                reportData.section3_2.uin.integrated,
+                reportData.section3_2.uin.central,
+                reportData.section3_2.uin.state,
+                reportData.section3_2.uin.cess]
+        ];
+
+        doc.autoTable({
+            head: [section32Headers],
+            body: section32Data,
+            startY: currentY + 5,
             theme: 'grid',
             headStyles: {
                 fillColor: [66, 66, 66],
@@ -504,7 +836,7 @@ exports.generateGstr3bPdf = async (reportData) => {
 
         // Section 4 - Input Tax Credit (ITC)
         doc.setFontSize(12);
-        let currentY = doc.lastAutoTable.finalY + 10;
+        currentY = doc.lastAutoTable.finalY + 10;
         doc.text('4. Input Tax Credit (ITC)', 14, currentY);
 
         // Table for section 4
@@ -512,19 +844,19 @@ exports.generateGstr3bPdf = async (reportData) => {
 
         const section4Data = [
             ['(A) ITC Available (eligible)',
-                reportData.section4.itc.eligible.igst,
-                reportData.section4.itc.eligible.cgst,
-                reportData.section4.itc.eligible.sgst,
-                reportData.section4.itc.eligible.cess],
+                reportData.section4.itc.net.integrated,
+                reportData.section4.itc.net.central,
+                reportData.section4.itc.net.state,
+                reportData.section4.itc.net.cess],
             ['(B) ITC Reversed',
-                reportData.section4.itc.reversed.igst,
-                reportData.section4.itc.reversed.cgst,
-                reportData.section4.itc.reversed.sgst,
-                reportData.section4.itc.reversed.cess],
+                Object.values(reportData.section4.itc.reversed).reduce((sum, cat) => sum + cat.integrated, 0),
+                Object.values(reportData.section4.itc.reversed).reduce((sum, cat) => sum + cat.central, 0),
+                Object.values(reportData.section4.itc.reversed).reduce((sum, cat) => sum + cat.state, 0),
+                Object.values(reportData.section4.itc.reversed).reduce((sum, cat) => sum + cat.cess, 0)],
             ['(C) Net ITC Available (A-B)',
-                reportData.section4.itc.net.igst,
-                reportData.section4.itc.net.cgst,
-                reportData.section4.itc.net.sgst,
+                reportData.section4.itc.net.integrated,
+                reportData.section4.itc.net.central,
+                reportData.section4.itc.net.state,
                 reportData.section4.itc.net.cess]
         ];
 
@@ -549,14 +881,51 @@ exports.generateGstr3bPdf = async (reportData) => {
         const section5Headers = ['Nature of supplies', 'Inter-State supplies', 'Intra-State supplies'];
 
         const section5Data = [
-            ['Exempt, nil-rated and non-GST inward supplies',
-                reportData.section5.exempt_nil_non_gst.interstate,
-                reportData.section5.exempt_nil_non_gst.intrastate]
+            ['Exempt supplies',
+                reportData.section5.exempt_nil_non_gst.exempt.interstate,
+                reportData.section5.exempt_nil_non_gst.exempt.intrastate],
+            ['Nil-rated supplies',
+                reportData.section5.exempt_nil_non_gst.nil_rated.interstate,
+                reportData.section5.exempt_nil_non_gst.nil_rated.intrastate],
+            ['Non-GST supplies',
+                reportData.section5.exempt_nil_non_gst.non_gst.interstate,
+                reportData.section5.exempt_nil_non_gst.non_gst.intrastate]
         ];
 
         doc.autoTable({
             head: [section5Headers],
             body: section5Data,
+            startY: currentY + 5,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [66, 66, 66],
+                textColor: 255,
+                fontStyle: 'bold'
+            }
+        });
+
+        // Section 5.1 - Interest and Late Fees
+        doc.setFontSize(12);
+        currentY = doc.lastAutoTable.finalY + 10;
+        doc.text('5.1 Interest and Late Fees', 14, currentY);
+
+        const section51Headers = ['Details', 'IGST', 'CGST', 'SGST', 'CESS'];
+        const section51Data = [
+            ['Interest',
+                reportData.section5_1.interest.paid.integrated,
+                reportData.section5_1.interest.paid.central,
+                reportData.section5_1.interest.paid.state,
+                reportData.section5_1.interest.paid.cess],
+            ['Late Fee',
+                reportData.section5_1.lateFee.integrated,
+                reportData.section5_1.lateFee.central,
+                reportData.section5_1.lateFee.state,
+                reportData.section5_1.lateFee.cess]
+        ];
+
+        doc.autoTable({
+            head: [section51Headers],
+            body: section51Data,
             startY: currentY + 5,
             theme: 'grid',
             headStyles: {
@@ -576,14 +945,14 @@ exports.generateGstr3bPdf = async (reportData) => {
 
         const section6TaxData = [
             ['(a) Tax paid through Cash',
-                reportData.section6.payment.tax.igst.cash,
-                reportData.section6.payment.tax.cgst.cash,
-                reportData.section6.payment.tax.sgst.cash,
+                reportData.section6.payment.tax.integrated.cash,
+                reportData.section6.payment.tax.central.cash,
+                reportData.section6.payment.tax.state.cash,
                 reportData.section6.payment.tax.cess.cash],
             ['(b) Tax paid through ITC',
-                reportData.section6.payment.tax.igst.itc,
-                reportData.section6.payment.tax.cgst.itc,
-                reportData.section6.payment.tax.sgst.itc,
+                reportData.section6.payment.tax.integrated.itc,
+                reportData.section6.payment.tax.central.itc,
+                reportData.section6.payment.tax.state.itc,
                 reportData.section6.payment.tax.cess.itc]
         ];
 
@@ -591,34 +960,6 @@ exports.generateGstr3bPdf = async (reportData) => {
             head: [section6TaxHeaders],
             body: section6TaxData,
             startY: currentY + 5,
-            theme: 'grid',
-            headStyles: {
-                fillColor: [66, 66, 66],
-                textColor: 255,
-                fontStyle: 'bold'
-            }
-        });
-
-        // Table for interest and late fee
-        const section6OtherHeaders = ['Description', 'IGST', 'CGST', 'SGST', 'CESS'];
-
-        const section6OtherData = [
-            ['(c) Interest',
-                reportData.section6.payment.interest.igst,
-                reportData.section6.payment.interest.cgst,
-                reportData.section6.payment.interest.sgst,
-                reportData.section6.payment.interest.cess],
-            ['(d) Late Fee',
-                '',
-                reportData.section6.payment.lateFee.cgst,
-                reportData.section6.payment.lateFee.sgst,
-                '']
-        ];
-
-        doc.autoTable({
-            head: [section6OtherHeaders],
-            body: section6OtherData,
-            startY: doc.lastAutoTable.finalY + 5,
             theme: 'grid',
             headStyles: {
                 fillColor: [66, 66, 66],
@@ -729,13 +1070,13 @@ exports.getTransactionSummary = async (companyId, year, month) => {
 exports.calculateNetLiability = (reportData) => {
     // Calculate total output tax
     const outputTax = {
-        igst: reportData.section3_1.outward_taxable.igst +
-            reportData.section3_1.outward_zero.igst +
-            reportData.section3_1.inward_reverse_charge.igst,
-        cgst: reportData.section3_1.outward_taxable.cgst +
-            reportData.section3_1.inward_reverse_charge.cgst,
-        sgst: reportData.section3_1.outward_taxable.sgst +
-            reportData.section3_1.inward_reverse_charge.sgst,
+        integrated: reportData.section3_1.outward_taxable.integrated +
+            reportData.section3_1.outward_zero.integrated +
+            reportData.section3_1.inward_reverse_charge.integrated,
+        central: reportData.section3_1.outward_taxable.central +
+            reportData.section3_1.inward_reverse_charge.central,
+        state: reportData.section3_1.outward_taxable.state +
+            reportData.section3_1.inward_reverse_charge.state,
         cess: reportData.section3_1.outward_taxable.cess +
             reportData.section3_1.outward_zero.cess +
             reportData.section3_1.inward_reverse_charge.cess
@@ -746,17 +1087,17 @@ exports.calculateNetLiability = (reportData) => {
 
     // Calculate net tax liability (Output Tax - ITC)
     const netLiability = {
-        igst: Math.max(0, outputTax.igst - netITC.igst),
-        cgst: Math.max(0, outputTax.cgst - netITC.cgst),
-        sgst: Math.max(0, outputTax.sgst - netITC.sgst),
+        integrated: Math.max(0, outputTax.integrated - netITC.integrated),
+        central: Math.max(0, outputTax.central - netITC.central),
+        state: Math.max(0, outputTax.state - netITC.state),
         cess: Math.max(0, outputTax.cess - netITC.cess),
     };
 
     // Calculate total liability
     const totalLiability =
-        netLiability.igst +
-        netLiability.cgst +
-        netLiability.sgst +
+        netLiability.integrated +
+        netLiability.central +
+        netLiability.state +
         netLiability.cess;
 
     return {
