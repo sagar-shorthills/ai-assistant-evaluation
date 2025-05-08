@@ -1,189 +1,219 @@
-MongoDB Data Exploration Tool with GST Integration
-Build a full-stack MongoDB Data Exploration Tool with GST calculation capabilities using Node.js, Express, React.js, and Material UI.
-Tech Stack Requirements
+You are working on a MongoDB Data Exploration Tool with GST Integration, built using:
 
-Backend: Node.js + Express.js (latest stable versions)
-Database: MongoDB with official Node.js driver (latest version)
-Frontend: React.js (latest stable version)
-UI Components: Material UI (MUI v5+)
-State Management: React State / Context API or React Query
-File Export: xlsx, papaparse, jspdf
-Dependencies: Use only compatible and up-to-date dependencies to avoid conflicts
+Backend: Node.js + Express.js (latest stable)
 
-Backend (Node.js + Express)
-MongoDB Connection
+Database: MongoDB (latest)
 
-Use the official MongoDB npm package to connect to MongoDB
-Store credentials securely using environment variables
-Implement connection pooling for optimal performance
+Frontend: React.js with Material UI (MUI v5+)
 
-API Endpoints
+Current Codebase
+The backend folder has:
 
-GET /collections: Return a list of available collections in the MongoDB database
-GET /fields?collection=collectionName: Fetch the first document from the specified collection and dynamically extract available fields/columns
-POST /query: Accept collection name, limit, selected fields, and GST configuration as parameters. Return query results based on the selection with calculated GST amounts
-POST /export: Accept selected data and desired format (excel, csv, json, pdf). Return the generated file ready for download
-GET /receipt/: Generate a receipt-style view for a specific document
+/config/db.js → MongoDB connection setup
 
-Error Handling
+/controllers/collectionController.js, queryController.js → main controllers
 
-APIs must respond with appropriate HTTP status codes and error messages
-MongoDB errors must be caught, properly logged, and handled gracefully
-Implement rate limiting to prevent abuse
+/services/mongoService.js → MongoDB access helpers
 
-Frontend (React.js + Material UI)
-Layout
+/routes/collectionRoutes.js, queryRoutes.js → API routes
 
-Header: Clean, modern application title with intuitive navigation
-Left Sidebar:
+/utils/gstCalculator.js → GST-related calculations
 
-Application navigation menu
-Collection selector (MUI Select component)
-Numeric input for "Limit Results" (default 5) (MUI TextField)
-Dynamic multi-select widget for fields (MUI Autocomplete with multiple select)
-GST configuration section
+Objective
+I want you to add a new backend feature:
 
+API Endpoint: POST /api/report/gstr3b
 
-Main Area:
+Controller: Add a gstrController.js
 
-Results display panel
-Toggle between Table and JSON view
-Download options
-Individual record actions (Print/Receipt view)
+Route: Wire this endpoint in the Express routes
 
+Logic: Generate the GSTR-3B monthly GST return report for a company
 
+Detailed Requirements
+Data Sources (MongoDB collections):
 
-GST Integration Features
+companies: Company master details
 
-GST Configuration:
+supply_transactions: Outward/inward supply transactions
 
-Dropdown to select GST percentage (e.g., 5%, 12%, 18%, 28%)
-Field selector to choose which field to apply GST on
-Apply button to calculate GST on existing results
+itc_payments: ITC (Input Tax Credit) and payment details
 
+Input:
 
-GST Calculation:
+companyId (UUID string)
 
-Add a new column "GST Amount" in results
-Calculate using formula: Selected Field Value / GST Percentage * 100
-Update JSON view to include GST Amount field
-Ensure GST calculations are included in all export formats
+year (number, e.g., 2025)
 
+month (number, 1–12)
 
-Receipt Generation:
+Processing Tasks:
 
-Add a "Print Receipt" button for each record
-Generate a receipt-style view showing document details with GST calculation
-Allow printing and downloading of individual receipts
-Use jspdf or similar library for PDF generation
+Fetch company details → from companies
 
+Aggregate supply transactions → group by:
 
+Type: OUTWARD/INWARD
 
-Dynamic Field Selection
+SubType: TAXABLE, ZERO_RATED, EXEMPT, RCM
 
-When a user selects a collection:
+Calculate totals for taxable value and taxes (integrated, central, state, cess)
 
-Fetch available fields dynamically using /fields API
-Populate fields multi-select based on the fetched fields
-Display all fields directly without requiring additional selection from dropdown
+Identify reverse charge (RCM) inward supplies
 
+Get e-commerce operator transactions → filter supply_transactions where counterparty is an e-commerce operator
 
+Break down inter-state supplies → by unregistered persons, composition dealers, UIN holders
 
-Results Display
+Aggregate ITC (Input Tax Credit) → from itc_payments, calculate:
 
-Table View (MUI DataGrid or Table) by default
+Eligible ITC
 
-Clear column headers
-Pagination for large result sets
-Sortable columns
-Row actions (Print Receipt)
+Reversed ITC
 
+Net ITC = eligible - reversed
 
-JSON View alternative
+Reclaimed ITC
 
-Formatted JSON with syntax highlighting
-Collapsible sections for better readability
+Ineligible ITC
 
+Calculate payments → tax payable, ITC used, cash paid, interest, late fees
 
-Maintain results even if view toggles or downloads happen
+Output Response:
+A JSON object structured as:
 
-Export Functionality
-
-Primary Download Button with dropdown offering:
-
-Excel format (default)
-CSV format
-JSON format
-PDF format
-
-
-Include calculated GST amount in all exported files
-Show progress indicator during export generation
-
-State Management
-
-Persist fetched query results locally using React state
-Results should not reset unless a new query is explicitly triggered
-Save user preferences (selected collection, fields, GST settings) to browser storage
-
-UI/UX Requirements
-
-Clean, modern UI following Material UI best practices
-Intuitive layout with clear visual hierarchy
-Responsive design that works on various screen sizes
-Proper loading indicators when data is being fetched
-Toast notifications for errors and success messages
-Consistent color scheme and typography
-Accessibility compliance (WCAG 2.1 AA)
-
-Error Handling & Validation
-
-Form validation for all inputs
-Graceful handling of empty results
-Friendly error messages for failed operations
-Network error detection and retry options
-
-Project Structure & Code Quality
-
-Well-structured project directories (/backend, /frontend)
-Separation of concerns (components, services, utilities)
-Production-quality, maintainable code with proper comments
-Consistent code style and formatting
-Unit tests for critical functionality
-
-Deliverables
-
-Complete source code with clear directory structure
-.env template for MongoDB credentials (server-side only)
-Frontend setup with Material UI components
-Documentation (README) explaining:
-
-Setup instructions
-Environment configuration
-Available features
-API endpoints
-GST calculation logic
-
-
-Docker configuration for easy deployment (optional)
-
-Sample Document Structure
-json{
-  "_id": {"$oid": "6811a7051c6d4566e8bb0183"},
-  "Segment": "Government",
-  "Country": "Canada",
-  "Product": "Carretera",
-  "Discount Band": "None",
-  "Units Sold": {"$numberDouble": "1618.5"},
-  "Manufacturing Price": {"$numberInt": "3"},
-  "Sale Price": {"$numberInt": "20"},
-  "Gross Sales": {"$numberInt": "32370"},
-  "Discounts": {"$numberInt": "0"},
-  "Sales": {"$numberInt": "32370"},
-  "COGS": {"$numberInt": "16185"},
-  "Profit": {"$numberInt": "16185"},
-  "Date": {"$numberInt": "41640"},
-  "Month Number": {"$numberInt": "1"},
-  "Month Name": "January",
-  "Year": "2014"
+{
+  "company": { "legalName": "...", "tradeName": "...", "gstin": "...", "authorizedSignatory": { "name": "...", "designation": "..." } },
+  "period": { "year": 2025, "month": 1 },
+  "section3_1": { ... },
+  "section3_1_1": { ... },
+  "section3_2": { ... },
+  "section4": { ... },
+  "section5": { ... },
+  "section5_1": { ... },
+  "section6": { ... }
 }
+Each section should follow the official GSTR-3B structure and show aggregated totals.
+
+Code Expectations:
+
+Add a new controller → gstrController.js
+
+Add a route file (or extend existing) → wire the /api/report/gstr3b POST endpoint
+
+Use the MongoDB official Node.js driver (no extra ODMs like Mongoose)
+
+Use async/await and proper error handling
+
+Place reusable MongoDB queries into the mongoService.js or add helpers if needed
+
+Ensure the API returns:
+
+200 OK → with report JSON
+
+Proper 400 or 500 status on errors
+
+Log and handle MongoDB errors gracefully
+
+Updated File Structure:
+After your update, the backend should include:
+
+backend/
+  controllers/
+    gstrController.js
+  routes/
+    gstrRoutes.js  (or extend existing routes)
+Deliverables:
+
+GSTR-3B sections
+Calculate Section-wise GSTR-3B fields:
+
+Header Section:
+
+Legal name, trade name, GSTIN
+
+Return period (year, month)
+
+ARN and date (mock for now)
+
+Authorized signatory details
+
+Section 3.1 (Outward & Inward Supplies)
+
+Group supply_transactions where type = OUTWARD by:
+
+TAXABLE → regular taxable supplies
+
+ZERO_RATED → zero-rated supplies
+
+EXEMPT → nil-rated/exempted supplies
+
+NON_GST → non-GST outward supplies
+
+For type = INWARD and subType = RCM, aggregate under inward supplies liable to reverse charge
+
+For each group, provide:
+
+Total taxable value
+
+Tax amounts (Integrated, Central, State, Cess)
+
+Section 3.1.1 (Section 9(5) Supplies)
+
+Track transactions via e-commerce operator (if applicable; assume counterparty.state or flag marks it)
+
+Section 3.2 (Inter-state Supplies)
+
+Group inter-state supplies by:
+
+Unregistered persons
+
+Composition taxable persons
+
+UIN holders
+
+Section 4 (Eligible ITC)
+
+Sum up itc_payments.itc.amount where eligible = true
+
+Sum up ITC reversed (rules 38, 42, 43)
+
+Calculate Net ITC: eligible ITC − reversed ITC
+
+Track ITC reclaimed, ineligible ITC under section 16(4), PoS-restricted ITC
+
+Section 5 (Exempt / Nil-rated / Non-GST Supplies)
+
+Track supplies from composition scheme, exempt supplies, nil-rated, non-GST supplies
+
+Separate inter-state and intra-state
+
+Section 5.1 (Interest & Late Fees)
+
+Report:
+
+System-computed interest
+
+Interest paid
+
+Late fees (Integrated, Central, State, Cess)
+
+Section 6 (Tax Payment Details)
+
+Tax payable amounts
+
+Adjustments from previous periods
+
+Net tax payable
+
+Tax paid (through ITC, in cash)
+
+Interest and late fee paid in cash
+
+Updated package.json (if new dependencies added)
+
+Updated route setup in server.js
+
+A controller with clean, well-commented code that pulls and aggregates the correct data
+
+A clear, structured response matching GSTR-3B sections

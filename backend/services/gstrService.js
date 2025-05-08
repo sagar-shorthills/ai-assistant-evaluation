@@ -51,8 +51,8 @@ exports.generateGstr3bReport = async (companyId, year, month) => {
                     month,
                     year
                 },
-                arn: "AA160125035845A",
-                arnDate: "20/02/2025",
+                arn: "BB29DJFN3859",
+                arnDate: "08/05/2025",
                 authorizedSignatory: company.authorizedSignatory
             },
             section3_1: {
